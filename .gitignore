@@ -1,6 +1,10 @@
+#API_Keyの格納庫
+config.json
+
 # Logs
 logs
 *.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -57,7 +61,7 @@ web_modules/
 # Optional stylelint cache
 .stylelintcache
 
-# Microbundle cache
+# Microbundle cache A/の場合には、A以下のフォルダのすべてを除外するという意味になる
 .rpt2_cache/
 .rts2_cache_cjs/
 .rts2_cache_es/
@@ -72,7 +76,7 @@ web_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variable files
+# dotenv environment variable files(pythonの仮想環境排除)
 .env
 .env.development.local
 .env.test.local
@@ -86,6 +90,7 @@ web_modules/
 # Next.js build output
 .next
 out
+not_processed/
 
 # Nuxt.js build / generate output
 .nuxt
