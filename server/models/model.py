@@ -1,5 +1,9 @@
 from db.dbset import MongoDBClient
+from pymongo import UpdateOne
+from pymongo.errors import BulkWriteError
+from bson.objectid import ObjectId
 from datetime import datetime
+from pprint import pprint
 #特許文書を操作するクラス
 class patentDocument:
     """
@@ -74,3 +78,41 @@ class patentDocument:
         
     def set_brief_summary(self,application_num:int,brief_summary:str):
         pass
+    
+    def get_all_problems_dont_have_span_problem_list(self,max_doc:int)->list[dict[str,str]]:
+        '''span_problem_listを持たないすべてのdocumentから、_idとproblemを抽出して、listで返すメソッド'''
+        #find({条件}、{select})->cursor(db用イテレータ)
+        if max_doc is None:
+            problems = self.collection.find(
+                {'span_problem_list':{'$exists':False}}, 
+                {'_id': 1,'problem': 1}) 
+        #doc数が制限されているとき
+        else:
+            problems = self.collection.find(
+                {'span_problem_list':{'$exists':False}},
+                {'_id': 1,'problem': 1}).limit(max_doc) 
+        # cursorからlistを作成する。
+        doc_list=[]
+        for doc in problems:
+            doc_dict={'id':doc['_id'],
+                      'problem':doc['problem']}
+            doc_list.append(doc_dict)
+        return doc_list
+    
+    def bulk_update_span_problem_list(self,id_list:list[ObjectId],span_p_dict:dict[list[str]]):
+        """_summary_ 与えられたid_listの数だけ、一気にspan_problem_listを追加する。現在の挙動では、10件ごとに処理することが期待される。
+            また、順序なしのbulk操作であるため、エラーを拾うこと。
+            
+        Args:
+            id_list (list[ObjectId]): _description_
+            span_p_dict (dict[list[str]]): key:list[str]の形で10要素が入っているdict
+        """
+        operations=[]
+        i=0
+        for span_problem_list in span_p_dict.values():
+            operations.append(UpdateOne({'_id': id_list[i]}, {'$set': {'span_problem_list': span_problem_list}}))
+            i+=1
+        try:
+            self.collection.bulk_write(operations,ordered=False)
+        except BulkWriteError as bwe:
+            pprint(bwe.details)

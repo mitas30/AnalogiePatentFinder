@@ -1,6 +1,9 @@
 #API_Keyの格納庫
 config.json
 
+# データの保管
+data/
+
 # Logs
 logs
 *.log

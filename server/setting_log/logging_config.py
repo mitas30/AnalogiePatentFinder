@@ -41,7 +41,7 @@ class CleanFormatter(logging.Formatter):
 def setup_logging():
     """アプリケーションのログ設定を行う関数。"""
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # デバッグレベル以上のすべてのログを記録
+    logger.setLevel(logging.INFO)  # デバッグレベル以上のすべてのログを記録
 
     # コンソール出力用のハンドラー設定
     console_handler = logging.StreamHandler()
@@ -49,7 +49,7 @@ def setup_logging():
     logger.addHandler(console_handler)
 
     # ファイル出力用のハンドラー設定 INFO以上のみ記録する
-    file_handler = RotatingFileHandler('app.log', maxBytes=1048576, backupCount=3,encoding='utf-8')
+    file_handler = RotatingFileHandler('log/app.log', maxBytes=1048576, backupCount=3,encoding='utf-8')
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(CleanFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(file_handler)

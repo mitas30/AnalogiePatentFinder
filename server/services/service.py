@@ -1,9 +1,11 @@
-import json,logging,os,shutil,re,datetime
+import json,logging,os,shutil,re,datetime,time
 import fitz
+from pprint import pprint
+from bson.objectid import ObjectId
 from typing import Tuple
 from fitz import Document
 from openai import OpenAI
-from models.model import patentDocument
+from models.model import patentDocument 
 
 logger = logging.getLogger(__name__)
 
@@ -11,19 +13,86 @@ class SplitError(Exception):
     """特定の分割操作で期待される条件を満たさない場合に発生する例外"""
     pass
 
-#GPTを使うクラス
 class gptClient:
+    '''GPTを使ったメソッド集合のクラス'''
     def __init__(self):
-        self.openai_api_key = self.load_api_key()
+        self.openai_api_key = self._load_api_key()
         self.client=OpenAI(api_key=self.openai_api_key)
         
-    def _load_api_key()->str:
+    def _load_api_key(self)->str:
         # JSON設定ファイルを開いて読み込む
-        with open('../config.json', 'r') as file:
+        #ファイルのパスは、実行ファイルからの相対パス
+        with open('config.json', 'r') as file:
             config = json.load(file)
         return config['OPENAI_API_KEY']
     
-    def make_brief_summary(summary:str)->str:
+    def upload_file(self,jsonl_filename:str,purpose:str)->str:
+        """_summary_  batch処理用のファイルjsonl_filename.jsonlをopenaiにアップロードする
+
+        Args:
+            jsonl_fileplace (str): batch処理用のjsonlファイルの名前 場所は必要ない
+            例えば、jsonl_fileplace="input"の場合、../data/openai_batch/input/input.jsonlをアップロードする
+            purpose: batch処理の目的を指定する(openAI側の引数) batch or fine-tune
+
+        Returns:
+            str: file_id(各処理で指定することになるファイルのid)
+        """
+        file_path="../data"
+        if purpose=="batch":
+            file_path+="/openai_batch/input/"+jsonl_filename+".jsonl"
+        elif purpose=="fine-tune":
+            file_path+="/fine-tuning/"+jsonl_filename+".jsonl"
+        else:
+            logger.log(logging.ERROR,"purposeが不正です")
+            return ""
+        response = self.client.files.create(
+        file=open(file_path, "rb"),
+        purpose=purpose
+        )
+        batchfile_id=response.id
+        logger.log(logging.INFO,f"id:{batchfile_id} filesize:{response.bytes}Byte ")
+        return batchfile_id
+    
+    def divide_problems(self,problem_list:list[str],is_collect:bool)->dict[list[str]]:
+        ''' summary:\n
+            problem_list(10の特許がlistにされている)のproblemは、複数の目的(問題)を述べている可能性がある。\n
+            したがって、これを単一のspanに分解する。\n
+            is_collectがtrueになっている場合は、会話データを収集する
+        '''
+        with open('llm_prompt/dismantle.json', 'r', encoding='utf-8') as file:
+            #.jsonでは、1つのobjectしか定義できない
+            # loadによって、jsonファイルをpythonのデータに変更できる
+            data = json.load(file)
+        # 特定のキーに対応するデータを取得
+        system_message = data.get('system_message')
+        user_message = data.get('user')
+        example_message = data.get('example')
+        model=""
+        if is_collect==True:
+            model="gpt-4-turbo"
+        else:
+            #TODO fine-tuningモデルに変更する
+            model="ft:gpt-3.5-turbo-0125:personal::9LrSN0B4"
+        messages=[
+            {"role": "system","content":system_message},
+            {"role": "user","content":f"{user_message}\n{example_message}\n<problem>\n{problem_list}"}
+        ]
+        st=time.time()
+        response=self.client.chat.completions.create(model=model,response_format={ "type": "json_object" },messages=messages)
+        return_message=json.loads(response.choices[0].message.content)
+        logger.log(logging.INFO,f"process_time:{time.time()-st:.2f}s input_token:{response.usage.prompt_tokens} output_token:{response.usage.completion_tokens} model:{response.model}")
+        if is_collect==True:
+            #jsonl形式に沿うように変換する
+            with open('../data/fine-tuning/function1.jsonl',"a",encoding='utf_8') as f:
+                insert_json_object={}
+                system_obj={"role":"system","content":system_message}
+                user_obj={"role":"user","content":f"{user_message}\n{example_message}\n<problem>\n{problem_list}"}
+                assistant_obj={"role":"assistant","content":str(return_message)}
+                insert_json_object["messages"]=system_obj,user_obj,assistant_obj                
+                f.write(json.dumps(insert_json_object,ensure_ascii=False)+'\n')
+        return return_message
+    
+    def make_brief_summary(self,summary:str)->str:
         "要約から、非専門家でもわかりやすい要約を再構成し、これをstringで返却する"
         return ""
     
@@ -204,7 +273,223 @@ class pdfDataProcessor:
                     logger.log(logging.ERROR,f"正常でないpdfファイル:{file_path}")
                     error_count+=1
         logger.log(logging.INFO,f"Batch[データベースへの格納] complete count={count},error_count={error_count}")
+
+class expDataCollector:
+    '''実験データの作成に関するクラス'''
+    def __init__(self, filename):
+        self.filename = filename
+
+    #Legacy: get_all_problems()の廃止
+    """def save_problems_to_file(self):
+        patent_provider=patentDocument()
+        problems = patent_provider.get_all_problems()
+        with open(self.filename, 'w', encoding='utf-8') as file:
+            for problem in problems:
+                file.write(problem + '\n')"""
+
+class gptBatch:
+    '''GPTを使ったbatch処理のクラス'''
+    def __init__(self):
+        self.openai_api_key = self._load_api_key()
+        self.client=OpenAI(api_key=self.openai_api_key)
+        
+    def _load_api_key(self)->str:
+        # JSON設定ファイルを開いて読み込む
+        #ファイルのパスは、実行ファイルからの相対パス
+        with open('config.json', 'r') as file:
+            config = json.load(file)
+        return config['OPENAI_API_KEY']
+        
+    def make_batch_request(self,batchfile_id:str)->str:
+        """_summary_  batchfile_idを使って、batch処理をopenaiに依頼する
+
+        Args:
+            batchfile_id (str): upload_file関数で取得したbatchfile_id
+            
+        Returns: batch_id: batch処理を識別するためのid
+        """
+        response = self.client.batches.create(
+        completion_window="24h",
+        endpoint="/v1/chat/completions",
+        input_file_id=batchfile_id
+        )
+        batch_id=response.id 
+        logger.log(logging.INFO,f"batch_id:{batch_id}")
+        return batch_id
+        
+        
+    def check_batch_status(self,batch_id:str)->str:
+        """_summary_  batch_idを使って、batch処理のstatusを確認する
+
+        Args:
+            batch_id (str): make_batch_requestで取得したbatch_id
+
+        Returns:
+            str: batch処理のstatus
+        """
+        response = self.client.batches.retrieve(batch_id)
+        logger.log(logging.INFO,f"status:{response.status}")
+        return response.status
     
+    def get_batch_output_file_id(self,batch_id:str)->str:
+        """_summary_ batch_idを使って、batch処理の結果であるjsonlファイルのidを取得する
+
+        Args:
+            batch_id (str): 
+
+        Returns:
+            str: _description_
+        """
+        response = self.client.batches.retrieve(batch_id)
+        return response.output_file_id
+        
+    def get_batch_result(self,output_file_id:str)->None:
+        """_summary_  batch_idを使って、batch処理の結果であるjsonlファイルを取得する
+
+        Args:
+            output_file_id (str): get_batch_output_file_idで取得したoutput_file_id
+        """
+        jsonl_content = self.client.files.content(output_file_id).text
+        with open("../data/openai_batch/res/batch_"+output_file_id+".jsonl", 'w', encoding='utf-8') as file:
+            file.write(jsonl_content)
+    
+    def ask_batch_result(self,batch_id:str)->None:
+        """_summary_  batch_idを使って、batch処理の結果を取得する。 batchが完了している場合は、output.jsonlに結果が書き込まれる
+
+        Args:
+             (str): get_batch_output_file_idで取得したoutput_file_id
+        """
+        status=self.check_batch_status(batch_id)
+        if status=="completed":
+            output_file_id=self.get_batch_output_file_id(batch_id)
+            self.get_batch_result(output_file_id)
+        else:
+            logger.log(logging.INFO,f"status:{status}")
+    
+    def batch_dismantle_problem(self,max_doc:int=None):
+        ''' 
+        _summary_ dismantle(文章から目的を取り出す処理)のbatch処理を行う。batchが完了したときに、データ収集まではしてくれない
+            
+        Args:
+            max_doc: 処理するdocの最大数 Noneの場合は、全ての該当docを処理する
+        '''
+        db_cli=patentDocument()
+        #step1 span_problem_listのフィールドを持たないdocumentから情報を取り出す。
+        # max_docがNoneの場合は、全てのdocを処理するが、それ以外の場合は、max_docの数だけ処理する
+        doc_list=db_cli.get_all_problems_dont_have_span_problem_list(max_doc)
+        #step1.5 dismantle.jsonを読み込む
+        with open('llm_prompt/dismantle.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        system_message = data.get('system_message')
+        user_message = data.get('user')
+        example_message = data.get('example')
+        #step2 batch処理に使用するinputのjsonlファイルを作成する
+        doc_num=len(doc_list)
+        problem_list = []
+        id_memo=[]
+        #NOTE 10個ずつ問題を処理する
+        for idx in range((doc_num+9)//10):
+            part_doc_list=doc_list[10*idx:min(10*(idx+1),doc_num)]
+            id_list=[str(d["id"]) for d in part_doc_list]
+            problem_chunk=[d["problem"] for d in part_doc_list]
+            problem_list.append(problem_chunk)
+            id_memo.append({str(idx):id_list})
+        jsonl_data=[]
+        for idx,problem_chunk in enumerate(problem_list):
+            request = {
+                "custom_id": f"request-{idx}",
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": {
+                    "model": "gpt-4-turbo",
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": f"{system_message}"},
+                        {"role": "user","content":f"{user_message}\n{example_message}\n<problem>\n{problem_chunk}"}
+                    ]
+                }
+            }
+            #json.dumps()は、オブジェクトをシングルラインで書き込むので安心
+            jsonl_data.append(json.dumps(request,ensure_ascii=False))
+        #step3 jsonlファイルを作成する 
+        #ObjectIDのリストを持つmemo,batch処理に使用するinput,問題のリストを持つproblemの3つのファイルを作成する
+        with open("../data/openai_batch/memo/"+re.sub(r'\.',r'_',str(time.time()))+".jsonl", 'w', encoding='utf-8') as file:
+            for item in id_memo:
+                file.write(json.dumps(item)+'\n')
+        jsonl_fileplace="in_"+re.sub(r'\.',r'_',str(time.time()))
+        jsonl_filepath="../data/openai_batch/input/"+jsonl_fileplace
+        with open(jsonl_filepath+".Jsonl", 'w', encoding='utf-8') as file:
+            for item in jsonl_data:
+                file.write(item + '\n')
+        with open("../data/openai_batch/memo/problem_"+re.sub(r'\.',r'_',str(time.time()))+".json", 'w', encoding='utf-8') as file:
+            file.write(json.dumps(problem_list,ensure_ascii=False))
+        #step4 batch処理をopenaiに依頼する
+        gpt_manip=gptClient()
+        batchfile_id=gpt_manip.upload_file(jsonl_fileplace,"batch")
+        self.make_batch_request(batchfile_id)
+ 
+class fineTuning:
+    def __init__(self):
+        self.openai_api_key = self._load_api_key()
+        self.client=OpenAI(api_key=self.openai_api_key)
+    
+    def _load_api_key(self)->str:
+        # JSON設定ファイルを開いて読み込む
+        #ファイルのパスは、実行ファイルからの相対パス
+        with open('config.json', 'r') as file:
+            config = json.load(file)
+        return config['OPENAI_API_KEY']
+    
+    def make_fine_tuning_request(self,training_file:str)->str:
+        """_summary_ fine-tuningのリクエストをopenaiに送信する
+
+        Args:
+            training_file (str): fine-tuningのためのjsonlファイルに対応するid
+
+        Returns:
+            str: 各fine-tuningに割り当てられたid
+        """
+        response=self.client.fine_tuning.jobs.create(
+            training_file=training_file,
+            model="gpt-3.5-turbo",
+        )
+        response_id=response.id
+        return response_id
+        
+    def do_fine_tuning(self,jsonl_filename:str)->str:
+        """_summary_ fine-tuningのリクエストをopenaiに送信する
+
+        Args:
+            jsonl_filename (str): fine-tuningのためのjsonlファイルの名前
+        
+        Returns: fine_tune_id: fine-tuningのid
+        """
+        gpt_manip=gptClient()
+        filename=gpt_manip.upload_file(jsonl_filename,"fine-tune")
+        fine_tune_id=self.make_fine_tuning_request(filename)
+        logger.log(logging.INFO,f"fine_tune_id:{fine_tune_id}")
+        return fine_tune_id
+        
+    def analyze_fine_tuning_model(self,finetune_id:str)->None:
+        """_summary_ fine-tuningの結果を分析する step,train_loss,validation_lossを表示する
+        また、検証データを追加していた場合は、その結果(valid_loss,valid_mean_token_accuracy)も表示する
+
+        Args:
+            finetune_id (str): 各fine-tuningに割り当てられたid
+        """
+        job=self.client.fine_tuning.jobs.retrieve(finetune_id)
+        result_file_id=job.result_files[0]
+        content=self.client.files.content(result_file_id).text
+        logger.log(logging.INFO,content)
+        
+    def evaluate_fine_tuning_model(self,finetune_model_id:str)->None:
+        """_summary_ fine-tuningの結果を評価する
+
+        Args:
+            finetune_model_id (str): 
+        """
+
+
 def provide_brief_summary(application_num: int) -> str:
     """
     特許申請番号に基づいて特許の簡潔な要約を提供する関数。
@@ -246,6 +531,98 @@ def provide_brief_summary(application_num: int) -> str:
     # 生成した要約を返す
     return brief_summary
 
+def make_span_problems_list(max_doc:int=None,
+                            is_collect:bool=False,is_write:bool=True):
+    """
+        summary:\n
+        max_doc個のproblemの文章を、複数の目的(問題)のspanのlistに加工する。\n
+        一度に10の文章を処理し、bulk_writeによってmongoに一度に書き込む。\n
+        is_correct==Trueの場合はfine-tuning用のデータを収集し、is_write==Trueの場合は、DBに書き込む
+        
+        Args: max_doc: 処理するdocの最大数 Noneの場合は、全ての該当docを処理する
+        is_collect: fine-tuning(または、検証)用のデータを作成するかどうか
+        is_write: DBに書き込むかどうか
+    """
+    #step1 span_problem_listの無いdocumentから情報を取り出す。
+    db_cli=patentDocument()
+    doc_list=db_cli.get_all_problems_dont_have_span_problem_list(max_doc)
+    client=gptClient()
+    doc_num=len(doc_list)
+    #NOTE 10個ずつ処理する    
+    for i in range((doc_num+9)//10):
+        #step2-1 GPTでspan_problemを取り出す
+        part_doc_list=doc_list[10*i:min(10*(i+1),doc_num)]
+        id_list=[d["id"] for d in part_doc_list]
+        problem_list=[d["problem"] for d in part_doc_list]
+        span_p_dict=client.divide_problems(problem_list,is_collect)
+        if len(span_p_dict)!=len(part_doc_list):
+            logger.log(logging.ERROR,f"""problemの数とoutputの数が合わない
+                       {len(part_doc_list)}だけproblemは入っているが、outputは{len(span_p_dict)}""")
+            for value in span_p_dict.values():
+                print(value)
+            continue
+        #step2-2 DBにspan_problemを挿入する
+        if is_write==True:
+            db_cli.bulk_update_span_problem_list(id_list,span_p_dict)
+            logger.log(logging.INFO,f"update{i} is done. {len(id_list)} documents are updated.")
+        else:
+            logger.log(logging.INFO,problem_list)
+            logger.log(logging.INFO,'-'*50)
+            logger.log(logging.INFO,f"answer:\n{span_p_dict}")
+        
 
+# JSONオブジェクトを読み込むための関数
+def read_jsonl(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        return [json.loads(line) for line in file]
 
+def write_batchf1_result_to_database(problems_fileplace:str,
+                                     id_memo_fileplace:str,
+                                     output_fileplace:str,
+                                     is_collect:bool=False,):
+    """_summary_ batch_dismanle_problemの結果をデータベースに書き込む
 
+    Args:
+        problems_fileplace (str): batch_dismanle_problemで処理したinputを保管するjsonファイル名
+        id_memo_fileplace (str): batch_dismanle_problemで処理したデータのobjectIDを保管するjsonファイル名
+        output_fileplace (str): batch_dismanle_problemで処理したoutputを保管するjsonlファイル名
+        is_collect (bool): fine-tuning(または、検証)用のデータを作成するかどうか
+    """
+    input=read_jsonl("../data/openai_batch/memo/"+problems_fileplace+".json")
+    id_memo=read_jsonl("../data/openai_batch/memo/"+id_memo_fileplace+".jsonl")
+    output=read_jsonl("../data/openai_batch/res/"+output_fileplace+".jsonl")
+    db_cli=patentDocument()
+    #id_memoとoutputを使って、dbに書き込む
+    for (id_chunk,input_chunk,output_chunk) in zip(id_memo,input[0],output):
+        str_id_list=id_chunk.values()
+        str_result=output_chunk.get("response").get("body").get("choices")[0].get("message").get("content")
+        for str_id_val in str_id_list:
+            id_list=[ObjectId(str_id) for str_id in str_id_val]
+        # 正規表現を用いて [???] 形式のテキストを全て抜き出す
+        pattern = r'\[([^\]]+)\]'
+        matches = re.findall(pattern, str_result)
+        span_p_dict={(index+1):match.split(",") for index,match in enumerate(matches)}
+        if len(span_p_dict)!=10:
+            logger.log(logging.ERROR,f"エラー: {len(span_p_dict)}")
+            for keys in id_chunk.keys():
+                print(keys)
+            pprint(str_result)
+            for value in span_p_dict.values():
+                print(value)
+        else:
+            logger.log(logging.INFO,"ok")
+            if is_collect==True:
+                with open('llm_prompt/dismantle.json', 'r', encoding='utf-8') as file:
+                    data=json.load(file)
+                system_message = data.get('system_message')
+                user_message = data.get('user')
+                example_message = data.get('example')
+                #jsonl形式に沿うように変換する
+                with open('../data/fine-tuning/function1.jsonl',"a",encoding='utf_8') as f:
+                    insert_json_object={}
+                    system_obj={"role":"system","content":system_message}
+                    user_obj={"role":"user","content":f"{user_message}\n{example_message}\n<problem>\n{input_chunk}"}
+                    assistant_obj={"role":"assistant","content":str(span_p_dict)}
+                    insert_json_object["messages"]=system_obj,user_obj,assistant_obj
+                    f.write(json.dumps(insert_json_object,ensure_ascii=False)+'\n')
+            #db_cli.bulk_update_span_problem_list(id_list,span_p_dict) 
