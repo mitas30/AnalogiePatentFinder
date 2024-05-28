@@ -1,0 +1,19 @@
+{
+    "dismantle_problem":{
+        "object_key":"",
+        "chunk_size":10,
+        "update_function":"bulk_update_span_problem_list",
+        "data_structure": {
+            "span_problem_list": "parameters"
+        }        
+    },
+    "annotate_improvement_parameters":{
+        "object_key":"object_parameters",
+        "chunk_size":15,
+        "update_function":"bulk_update_parameters",
+        "data_structure": {
+            "object": "object",
+            "parameters": "parameters"
+        }
+    }
+}

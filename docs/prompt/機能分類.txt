@@ -1,0 +1,207 @@
+A. Branch
+To cause a flow (material, energy, signal) to no longer be joined or mixed.
+
+1. Separate
+    To isolate a flow (material, energy, signal) into distinct components.
+    The separated components are distinct from the flow before separation, as well as each other.
+    Example: A glass prism separates light into different wavelength components to produce a rainbow.
+
+    i. Divide
+    To separate a flow.
+    Example: A vending machine divides the solid form of coins into appropriate denominations.
+
+    ii. Extract
+    To draw, or forcibly pull out, a flow.
+    Example: A vacuum cleaner extracts debris from the imported mixture and exports clean air to the environment.
+
+    iii. Remove
+    To take away a part of a flow from its prefixed place.
+    Example: A sander removes small pieces of the wood surface to smooth the wood.
+
+2. Distribute
+    To cause a flow (material, energy, signal) to break up.
+    The individual bits are similar to each other and the undistributed flow.
+    Example: An atomizer distributes (or sprays) hair-styling liquids over the head to hold the hair in the desired style.
+
+B. Channel
+To cause a flow (material, energy, signal) to move from one location to another location.
+
+3. Import
+    To bring in a flow (material, energy, signal) from outside the system boundary.
+    Example: A physical opening at the top of a blender pitcher imports a solid (food) into the system. Also, a handle on the blender pitcher imports a human hand.
+
+4. Export
+    To send a flow (material, energy, signal) outside the system boundary.
+    Example: Pouring blended food out of a standard blender pitcher exports liquid from the system. The opening at the top of the blender is a solution to the export sub-function.
+
+5. Transfer
+    To shift, or convey, a flow (material, energy, signal) from one place to another.
+
+    i. Transport
+    To move a material from one place to another.
+    Example: A coffee maker transports liquid (water) from its reservoir through its heating chamber and then to the filter basket.
+
+    ii. Transmit
+    To move energy from one place to another.
+    Example: In a hand-held power sander, the housing of the sander transmits human force to the object being sanded.
+
+6. Guide
+    To direct the course of a flow (material, energy, signal) along a specific path.
+    Example: A domestic HVAC system guides gas (air) around the house to the correct locations via a set of ducts.
+
+    i. Translate
+    To fix the movement of a flow by a device into one linear direction.
+    Example: In an assembly line, a conveyor belt translates partially completed products from one assembly station to another.
+
+    ii. Rotate
+    To fix the movement of a flow by a device around one axis.
+    Example: A computer disk drive rotates the magnetic disks around an axis so that the head can read data.
+
+    iii. Allow degree of freedom (DOF)
+    To control the movement of a flow by a force external to the device into one or more directions.
+    Example: To provide easy trunk access and close appropriately, trunk lids need to move along a specific degree of freedom. A four-bar linkage allows a rotational DOF for the trunk lid.
+
+C. Connect
+To bring two or more flows (material, energy, signal) together.
+
+7. Couple
+    To join or bring together flows (material, energy, signal) such that the members are still distinguishable from each other.
+    Example: A standard pencil couples an eraser and a writing shaft. The coupling is performed using a metal sleeve that is crimped to the eraser and the shaft.
+
+    i. Join
+    To couple flows together in a predetermined manner.
+    Example: A ratchet joins a socket on its square shaft interface.
+
+    ii. Link
+    To couple flows together by means of an intermediary flow.
+    Example: A turnbuckle links two ends of a steering cable together.
+
+8. Mix
+    To combine two flows (material, energy, signal) into a single, uniform homogeneous mass.
+    Example: A shaker mixes a paint base and its dyes to form a homogeneous liquid.
+
+D. Control magnitude
+To alter or govern the size or amplitude of a flow (material, energy, signal).
+
+9.Actuate
+    To commence the flow of energy, signal, or material in response to an imported control signal.
+    Example: A circuit switch actuates the flow of electrical energy and turns on a light bulb.
+
+10. Regulate
+    To adjust the flow of energy, signal, or material in response to a control signal, such as a characteristic of a flow.
+    Example: Turning the valves regulates the flow rate of the liquid flowing from a faucet.
+
+    i. Increase
+    To enlarge a flow in response to a control signal.
+    Example: Opening the valve of a faucet further increases the flow of water.
+
+    ii. Decrease
+    To reduce a flow in response to a control signal.
+    Example: Closing the valve further decreases the flow of propane to the gas grill.
+
+11. Change
+    To adjust the flow of energy, signal, or material in a predetermined and fixed manner.
+    Example: In a hand-held drill, a variable resistor changes the electrical energy flow to the motor, thus changing the speed at which the drill turns.
+
+    i. Increment
+    To enlarge a flow in a predetermined and fixed manner.
+    Example: A magnifying glass increments the visual signal (i.e., the print) from a paper document.
+
+    ii. Decrement
+    To reduce a flow in a predetermined and fixed manner.
+    Example: The gear train of a power screwdriver decrements the flow of rotational energy.
+
+    iii. Shape
+    To mold or form a flow.
+    Example: In the auto industry, large presses shape sheet metal into contoured surfaces that become fenders, hoods, and trunks.
+
+    iv. Condition
+    To render a flow appropriate for the desired use.
+    Example: To prevent damage to electrical equipment, a surge protector conditions electrical energy by excluding spikes and noise (usually through capacitors) from the energy path.
+
+12. Stop
+    To cease, or prevent, the transfer of a flow (material, energy, signal).
+    Example: A reflective coating on a window stops the transmission of UV radiation through a window.
+
+    i. Prevent
+    To keep a flow from happening.
+    Example: A submerged gate on a dam wall prevents water from flowing to the other side.
+
+    ii. Inhibit
+    To significantly restrain a flow, though a portion of the flow continues to be transferred.
+    Example: The structures of space vehicles inhibit the flow of radiation to protect crew and cargo.
+
+E. Convert
+To change from one form of a flow (material, energy, signal) to another.
+For completeness, any type of flow conversion is valid. In practice, conversions such as converting electricity to torque will be more common than converting solid to optical energy.
+Example: An electrical motor converts electricity to rotational energy.
+
+13. Transformation
+    To convert a flow (material, energy, signal) from one form to another.
+    Example: An electrical motor transforms electrical energy into rotational energy.
+
+F. Provision
+To accumulate or provide a material or energy flow.
+
+14. Store
+    To accumulate a flow.
+    Example: A DC electrical battery stores the energy in a flashlight.
+
+    i. Contain
+    To keep a flow within limits.
+    Example: A vacuum bag contains debris vacuumed from a house.
+
+    ii. Collect
+    To bring a flow together into one place.
+    Example: Solar panels collect UV sun rays to power small mechanisms.
+
+15. Supply
+    To provide a flow from storage.
+    Example: In a flashlight, the battery supplies energy to the bulb.
+
+G. Signal
+To provide information on a material, energy, or signal flow as an output signal flow.
+The information providing flow passes through the function unchanged.
+
+16. Sense
+    To perceive, or become aware, of a flow.
+    Example: An audiocassette machine senses if the end of the tape has been reached.
+
+    i. Detect
+    To discover information about a flow.
+    Example: A gauge on the top of a gas cylinder detects proper pressure ranges.
+
+    ii. Measure
+    To determine the magnitude of a flow.
+    Example: An analog thermostat measures temperature through a bimetallic strip.
+
+17. Indicate
+    To make something known to the user about a flow.
+    Example: A small window in the water container of a coffee maker indicates the level of water in the machine.
+
+    i. Track
+    To observe and record data from a flow.
+    Example: By tracking the performance of batteries, the low efficiency point can be determined.
+
+    ii. Display
+    To reveal something about a flow to the mind or eye.
+    Example: The xyz-coordinate display on a vertical milling machine displays the precise location of the cutting tool.
+
+18. Process
+    To submit information to a particular treatment or method having a set number of operations or steps.
+    Example: A computer processes a login request signal before allowing a user access to its facilities.
+
+H. Support
+To firmly fix a material into a defined location, or secure an energy or signal into a specific course.
+
+19. Stabilize
+    To prevent a flow from changing course or location.
+    Example: On a typical canister vacuum, the center of gravity is placed at a low elevation to stabilize the vacuum when it is pulled by the hose.
+
+20. Secure
+    To firmly fix a flow path.
+    Example: On a bicycling glove, a Velcro strap secures the human hand in the correct place.
+
+21. Position
+    To place a flow (material, energy, signal) into a specific location or orientation.
+    Example: The coin slot on a soda machine positions the coin to begin the coin evaluation and transportation procedure.

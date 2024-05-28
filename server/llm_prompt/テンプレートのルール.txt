@@ -1,0 +1,7 @@
+- 以下は、batch_processで統一的に扱うためのプロンプトのルール
+- 基本的に、promptは、system_message_templateと、user_message_templateで構成すること
+- system_messageは、llmに人格を与えるpersona、タスクの説明を行うinstruction、形式指定を行うoutput_formatのうち、任意のものを作成する。
+- user_messageは、any-shot promptのためのexampleと、入力を示す記号などをいれるinput_prefixのうち、任意のものを作成する。
+- user_message内のinputは、DBから拾ってきていれる部分
+- ただし、いずれかの要素が必要なくても、関数の都合上空文字列を作成する。
+- {}は、pythonではformatによるstringの動的作成となるため、promptの中に入れない

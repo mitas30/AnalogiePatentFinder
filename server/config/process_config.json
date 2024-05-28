@@ -1,0 +1,29 @@
+{
+    "dismantle_problem": {
+        "get_documents_func": "get_all_problems_dont_have_span_problem_list",
+        "prompt_filepath": "llm_prompt/dismantle_problem.json",
+        "gpt_function":"_divide_problems",
+        "update_function":"bulk_update_span_problem_list",
+        "chunk_size": 10,
+        "prefix": "dismantle",
+        "save_additional_data": false
+    },
+    "annotate_improvement_parameters": {
+        "get_documents_func": "get_documents_without_parameters",
+        "prompt_filepath": "llm_prompt/annotate_improvement_parameters.json",
+        "gpt_function":"annotate_improvement_parameters_from_patent",
+        "update_function":"bulk_update_parameters",
+        "chunk_size": 15,
+        "prefix": "annotate",
+        "save_additional_data": false
+    },
+    "categorize_functions":{
+        "get_documents_func":"get_documents_without_function_classes",
+        "prompt_filepath": "llm_prompt/categorize_functions.json",
+        "gpt_function":"categorize_functions",
+        "update_function":"bulk_update_function_classes",
+        "chunk_size": 50,
+        "prefix": "categorize",
+        "save_additional_data": false
+    }
+}
