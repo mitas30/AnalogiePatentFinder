@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import SearchPage from '@/views/SearchPage.vue';
-import PatentDetail from '@/views/PatentDetail.vue';
+import SearchResults from '@/views/SearchResults.vue';
 
 const routes = [
   {
@@ -9,10 +9,10 @@ const routes = [
     component: SearchPage
   },
   {
-    path: '/patent/:id',
-    name: 'patent-detail',
-    component: PatentDetail
-  }
+    path: '/results',
+    name: 'search-results',
+    component: SearchResults
+  },
 ];
 
 const router = createRouter({

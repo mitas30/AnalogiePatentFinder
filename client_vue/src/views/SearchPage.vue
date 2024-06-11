@@ -1,12 +1,6 @@
 <template>
   <div>
-    <SearchBar @search="handleSearch" />
-    <ul v-if="results.length > 0">
-      <li v-for="result in results" :key="result.id">
-        {{ result.title }}
-        <router-link :to="{ name: 'patent-detail', params: { id: result.id } }">完全な情報を表示</router-link>
-      </li>
-    </ul>
+    <SearchBar :history="searchHistory" @search="handleSearch" @add-history="addHistory" />
   </div>
 </template>
 
@@ -19,19 +13,35 @@ export default {
   },
   data() {
     return {
-      results: []
+      searchHistory: []
     };
   },
   methods: {
     async handleSearch(query) {
-      // ダミーAPIコール
-      console.log(`APIに送信するクエリ: ${query}`);
-      // ダミーの検索結果を設定
-      this.results = [
-        { id: 1, title: `Dummy Patent 1 for "${query}"` },
-        { id: 2, title: `Dummy Patent 2 for "${query}"` }
-      ];
+      // URLを遷移させるだけで、データの取得はSearchResults.vueで行う
+      this.$router.push({ name: 'search-results', query: { q: query } });
+    },
+    addHistory(query) {
+      if (!this.searchHistory.includes(query)) {
+        this.searchHistory.push(query);
+        if (this.searchHistory.length > 5) {
+          this.searchHistory.shift();
+        }
+        this.saveHistory();
+      }
+    },
+    loadHistory() {
+      const history = localStorage.getItem('searchHistory');
+      if (history) {
+        this.searchHistory = JSON.parse(history);
+      }
+    },
+    saveHistory() {
+      localStorage.setItem('searchHistory', JSON.stringify(this.searchHistory));
     }
+  },
+  created() {
+    this.loadHistory();
   }
 };
 </script>

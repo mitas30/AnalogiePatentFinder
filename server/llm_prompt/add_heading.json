@@ -1,0 +1,9 @@
+{
+    "system_message_template":"{persona}\n\n\n{instruction}\n\n\n{output_format}",
+    "persona":"",
+    "instruction":"",
+    "output_format":"",
+    "user_message_template":"{example}\n\n\n{input_prefix}\n{input}",
+    "example":"",
+    "input_prefix":"<特許概要>"
+}

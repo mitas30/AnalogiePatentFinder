@@ -25,5 +25,14 @@
         "chunk_size": 50,
         "prefix": "categorize",
         "save_additional_data": false
+    },
+    "add_heading":{
+        "get_documents_func":"get_documents_without_heading",
+        "prompt_filepath": "llm_prompt/add_heading.json",
+        "gpt_function":"add_heading",
+        "update_function":"bulk_update_heading",
+        "chunk_size": 15,
+        "prefix": "add_heading",
+        "save_additional_data": false
     }
 }

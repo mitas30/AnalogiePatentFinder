@@ -1,11 +1,10 @@
-import json,logging,os,shutil,re,datetime,time
+import json,logging,os,shutil,re,datetime,time,requests
 import fitz
-from pprint import pprint
 from bson.objectid import ObjectId
 from typing import Tuple,Literal
 from fitz import Document
 from openai import OpenAI
-from models.model import patentManager,patentQuery,patentBulkUpdater,patentCleaner
+from models.model import patentManager,patentQuery,patentBulkUpdater,patentCleaner,abstractAdmin
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +97,9 @@ class gptClient:
         return return_message
     
     def annotate_improvement_parameters_from_patent(self, patent_data:list[dict],is_collect:bool)->dict:
-        """_summary_\n
-        特許データから、向上するパラメータとその対象を抽出する。\n
-        1回で15個の特許データを処理する。\n
+        """_summary_
+        \n特許データから、向上するパラメータとその対象を抽出する。
+        \n1回で15個の特許データを処理する。
 
         Args:
             patent_data (_type_): _description_
@@ -127,7 +126,6 @@ class gptClient:
         ]
         logger.log(logging.INFO,user_message)
         st=time.time()
-        pass
         response=self.client.chat.completions.create(model=self.current_model,response_format={ "type": "json_object" },messages=messages)
         logger.log(logging.INFO,f"process_time:{time.time()-st:.2f}s input_token:{response.usage.prompt_tokens} output_token:{response.usage.completion_tokens} model:{response.model}")
         return_message=json.loads(response.choices[0].message.content)
@@ -142,9 +140,9 @@ class gptClient:
                 f.write(json.dumps(insert_json_object, ensure_ascii=False) + '\n')
         return return_message
     
-    def categorize_functions(self, concrete_functions:list[dict],is_collect:bool)->dict:
+    def categorize_functions(self, concrete_functions:list[dict],is_collect:bool)->dict[str,list[dict[str,str]]]:
         """_summary_\n
-        機能データを抽象化して22のクラスのいずれかに分類する。\n
+        機能データを抽象化して45のクラスのいずれかに分類する。\n
         1回で50個の機能データを処理する。
 
         Args:
@@ -172,7 +170,6 @@ class gptClient:
         ]
         logger.log(logging.INFO,user_message)
         st=time.time()
-        pass
         response=self.client.chat.completions.create(model=self.current_model,response_format={ "type": "json_object" },messages=messages)
         logger.log(logging.INFO,f"process_time:{time.time()-st:.2f}s input_token:{response.usage.prompt_tokens} output_token:{response.usage.completion_tokens} model:{response.model}")
         return_message=json.loads(response.choices[0].message.content)
@@ -187,130 +184,150 @@ class gptClient:
                 f.write(json.dumps(insert_json_object, ensure_ascii=False) + '\n')
         return return_message
 
-    def make_brief_summary(self,summary:str)->str:
-        "要約から、非専門家でもわかりやすい要約を再構成し、これをstringで返却する"
-        return ""
+    def add_heading(self, patent_data: list[dict], is_collect: bool) -> dict[str, list[dict[str, str]]]:
+        """_summary_
+        \n特許がパラメータAを向上させた方法について、解決方法を抜き出し、わかりやすい言葉に変換する。
+        1回で15個の特許データを処理する。ただし、パラメータ1つごとに1つの特許データとして扱う。
+
+        Args:
+            patent_data (list[dict]): 加工に使用する特許データ
+            is_collect (bool): fine-tuningのデータとして収集するかどうか
+
+        Returns:
+            dict[str, list[dict[str, str]]]: _description_
+        """
+        with open('llm_prompt/add_heading.json', 'r', encoding='utf-8') as file:
+            data = json.load(file)
+
+        system_message_template = data.get('system_message_template')
+        persona = data.get('persona')
+        instruction = data.get('instruction')
+        output_format = data.get('output_format')
+        user_message_template = data.get('user_message_template')
+        example = data.get('example')
+        input_prefix = data.get('input_prefix')
+        input_details = "\n".join([f"{i+1}\n{d['solve_way']}\n{d['abstracts']['parameter']}" for i, d in enumerate(patent_data)])
+        system_message = system_message_template.format(persona=persona, instruction=instruction, output_format=output_format)
+        user_message = user_message_template.format(example=example, input_prefix=input_prefix, input=input_details)
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ]
+        logger.log(logging.INFO, user_message)
+        st = time.time()
+        response = self.client.chat.completions.create(model=self.current_model, response_format={"type": "json_object"}, messages=messages)
+        logger.log(logging.INFO, f"process_time:{time.time() - st:.2f}s input_token:{response.usage.prompt_tokens} output_token:{response.usage.completion_tokens} model:{response.model}")
+        return_message = json.loads(response.choices[0].message.content)
+        if is_collect:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            with open(f'../data/fine-tuning/heading_{timestamp}.jsonl', "a", encoding='utf_8') as f:
+                insert_json_object = {}
+                system_obj = {"role": "system", "content": system_message}
+                user_obj = {"role": "user", "content": user_message}
+                assistant_obj = {"role": "assistant", "content": str(return_message)}
+                insert_json_object["messages"] = system_obj, user_obj, assistant_obj
+                f.write(json.dumps(insert_json_object, ensure_ascii=False) + '\n')
+        return return_message
     
 class pdfDataProcessor:
     """
     PDFデータを抽出、加工するクラス。\n
     DBとのインタラクションも含む。
     """
-    ERROR_IN_ABSTRACT = -1
-    ERROR_IN_DETAIL = -2
-    ERROR_IN_OTHER = -3
 
-    def __init__(self, fetch_folder_path=None, exception_folder=None):
+    def __init__(self, fetch_folder_path=None, processed_folder_path=None):
         if fetch_folder_path is None:
             fetch_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/patentPDFs/not_processed")
-        if exception_folder is None:
-            exception_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/patentPDFs/error_file")
+        if processed_folder_path is None:
+            processed_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/patentPDFs/processed")
 
         #正規化して形式を統一する
         self.fetch_folder_path = os.path.normpath(fetch_folder_path)
-        self.exception_folder = os.path.normpath(exception_folder)
+        self.processed_folder_path = os.path.normpath(processed_folder_path)
+        self.patentmanip = patentManager(collection_name="patents")
+        self.SUCCESS = 0
+        self.ERROR_IN_ABSTRACT = -1
+        self.ERROR_IN_DETAIL = -2
+        self.ERROR_IN_OTHER = -3
         
-    def getExceptionFolder(self, error_code):
+    def getFolderPath(self, result_code):
         """
-        エラーコードに基づき、対応する例外フォルダのパスを返す。
+        処理結果コードに基づき、対応するフォルダのパスを返す。
 
         Parameters:
-        error_code (int): 発生したエラーの種類を表すコード。
+        result_code (int): 処理結果を表すコード。成功の場合は0、エラーの場合はエラーコード。
 
         Returns:
-        str: 対応する例外フォルダのパス。
+        str: 対応するフォルダのパス。
         """
-        if error_code == self.ERROR_IN_ABSTRACT:
+        if result_code == 0:
+            folder_name = "Processed"
+        elif result_code == self.ERROR_IN_ABSTRACT:
             folder_name = "AboutAbstract"
+        elif result_code == self.ERROR_IN_DETAIL:
+            folder_name = "AboutDetail"
         else:
             folder_name = "Others"
-        return os.path.join(self.exception_folder, folder_name)
+
+        target_folder = os.path.join(self.processed_folder, folder_name)
+        if not os.path.exists(target_folder):
+            os.makedirs(target_folder)
+        return target_folder
     
-    def convertClassStrToList(self,ipc_class_str)->list[str]:
-        """class_strから、単一のキーワードのリストに変換する"""
-        class_list=[]
-        raw_class_list=re.split("\n",ipc_class_str)
-        for raw_keycode in raw_class_list:
-            keycode=re.sub("\s+\(.+\)","",raw_keycode)
-            class_list.append(keycode)
-        return class_list
-    
-    def batch_extract_patent_datas(self,folder_path:str):
+    def batch_extract_patent_datas(self, folder_path: str, keep_processed_files: bool):
         """
-        指定されたフォルダ(folder_pass)内に存在する全てのPDFファイルから特許データを抽出し、データベースに格納するバッチ処理を行う。
-        ただし、サブフォルダに格納されているファイルは取り出す
+        指定されたフォルダ(folder_path)内に存在する全てのPDFファイルから特許データを抽出し、データベースに格納するバッチ処理を行う。
         抽出やデータベース格納に失敗した場合、ファイルは例外フォルダに移動される。
-        """
-        logger.log(logging.INFO,"Batch[データベースへの格納] start")
-        patentmanip=patentManager(collection_name="patents")
-        #step1 folder_pathに存在するサブフォルダからも特許fileを取り出す。
-        self._make_flat(folder_path)
-        error_count=0
-        count=0
-        #folder_pathで指定されたすべての子孫ファイルに行う
-        for filename in os.listdir(folder_path):
-            file_path=os.path.join(folder_path, filename)
-            if os.path.isfile(file_path):
-                res_code = self._extract_one_patent(file_path,patentmanip)
-                if res_code == 0:
-                    os.remove(file_path)
-                    count+=1
-                else:
-                    logger.log(logging.ERROR,f"正常でないpdfファイル:{file_path}")
-                    error_count+=1
-        logger.log(logging.INFO,f"Batch[データベースへの格納] complete count={count},error_count={error_count}")
 
-    def extract_needed_data(self,file_path:str)->tuple:
-        """
-        1つの公開特許広報から特定の情報を抽出する。
-        公表特許公報(グローバルな出願)は、フォーマットが異なるため、使えない。
         Parameters:
-        file_path (str): 抽出するファイルのpath
-
-        成功した場合は、(apply_number(p_key,int),invent_name, problem, solve_way,ipc_class_list(list[str]),apply_date(datetime)) のタプルを返す。
-        失敗した場合は、SplitErrorを返す
+        folder_path (str): 処理対象のフォルダのパス。
+        keep_processed_files (bool): 処理したPDFを残すかどうかを指定するフラグ。
         """
-        pdf_doc=fitz.open(file_path)
-        #step1: 要約を含んだ、文書の上の部分だけを切り取る(選択図で)
-        doc_description=self._slice_patent_section(pdf_doc,r"【選択図】")
-        #step2: step1のstringから、情報を抽出する。
-        #2-1 要約から上と下で分ける
-        split_list=re.split(r"【\s*要\s*約\s*】.*\n",doc_description)
-        if len(split_list)!=2:
-            raise SplitError("【要約】が存在しない")
-        basic_info=split_list[0]
-        abstract=re.sub(r"\n","",split_list[1])
-        #*【選択図】があるが、要約から離れた位置に存在している場合、または[化*]が存在するときlen(m)!=2
-        #* ただし、これらの例外は13/3050
-        #* 【が2つのときも、[効果]や[構成]のようなときがあるが、この例外も7/3050
-        #* 問題を分解する教師あり分類器の都合上、課題と解決手段が存在している特許だけを受け付ける
-        #2-2 要約を課題と手段に分ける 
-        split_list=re.split(r"【\w*課題】|【\w*手段】",abstract)
-        if(len(split_list)!=3):
-            raise SplitError(f"要約が課題と手段に分かれていない split_len={str(len(split_list))}")
-        problem=split_list[1]
-        solve_way=split_list[2]
-        #step3 step1のstringから基本的な特許情報を抽出する
-        basic_info_list=re.split("【発明の名称】|Int\.Cl.+\n",basic_info)
-        if(len(basic_info_list)!=3):
-            logger.log(logging.DEBUG,f"{str(len(split_list))}\nfile_path={file_path}")
-        invent_name=re.match(".+",basic_info_list[2]).group()
-        #3-1 出願番号を取得する
-        if extracted_number:=re.search(r'特願(\d{4})-(\d+)',basic_info_list[1]):
-            year = extracted_number.group(1)
-            number = int(extracted_number.group(2))
-            apply_number = f"{year}{number:06}"
-        else:
-            raise SplitError("出願番号が存在しない") 
-        #3-2 IPC class_listを取得する
-        ipc_class_str=re.split("\nＦＩ",basic_info_list[1])[0]
-        ipc_class_list=self.convertClassStrToList(ipc_class_str)
-        #3-3 出願日を取得する(Date型で格納する)
-        if date_list:=re.search(r"\(22\)[^\(]+\((\d+)\.(\d+)\.(\d+)\)\n",basic_info_list[1]):
-            apply_date=datetime.datetime(int(date_list.group(1)),int(date_list.group(2)),int(date_list.group(3)))
-        else:
-            raise SplitError("出願日が存在しない") 
-        return apply_number,invent_name, problem, solve_way,ipc_class_list,apply_date
+        logger.log(logging.INFO, "Batch[データベースへの格納] start")
+        patentmanip = patentManager(collection_name="patents")
+        self._make_flat(folder_path)
+        error_count = 0
+        count = 0
+
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            if os.path.isfile(file_path):
+                res_code = self.extract_one_patent(file_path, patentmanip)
+                if res_code == self.SUCCESS:
+                    if keep_processed_files:
+                        success_folder = self.getFolderPath(result_code=res_code)
+                        shutil.move(file_path, os.path.join(success_folder, filename))
+                    else:
+                        os.remove(file_path)
+                    count += 1
+                else:
+                    logger.log(logging.ERROR, f"正常でないpdfファイル: {file_path}")
+                    error_folder = self.getFolderPath(result_code=res_code)
+                    shutil.move(file_path, os.path.join(error_folder, filename))
+                    error_count += 1
+
+        logger.log(logging.INFO, f"Batch[データベースへの格納] complete count={count}, error_count={error_count}")
+
+    #TODO 現在はSplitErrorのみを返すが、どこが原因なのかを返すようにする
+    def extract_one_patent(self,file_path:str,is_test:bool=False)->int:
+        """ 1つのPDFから情報を取り出す関数。
+            結果に応じたコードを返す
+        """
+        # 相対パスを絶対パスに変換
+        file_path = os.path.abspath(file_path)
+        
+        try:
+            extract_data=self._extract_needed_data(file_path)
+            if is_test:
+                logger.log(logging.INFO,f"extracted data:{extract_data}")
+                return self.SUCCESS
+            else:
+                result=self.patentmanip.add_patent_data(extract_data)
+                if result==0:
+                    return self.SUCCESS
+        except SplitError as e:
+            logger.log(logging.WARNING,f"{e}")
+            return self.ERROR_IN_ABSTRACT
 
     def _slice_patent_section(self,pdf_document:Document,pattern:str)->str:
         """
@@ -333,17 +350,92 @@ class pdfDataProcessor:
         #step2 patternより上の、最初の連続部分文字列を返す
         ret_str=re.split(pattern,target_page)[0]
         return ret_str
-
-    def _extract_one_patent(self,file_path:str,patentmanip:patentManager)->int:
-        """ 1つのPDFから情報を取り出す関数。
-            結果に応じたコードを返す
+    
+    def _extract_needed_data(self,file_path:str)->dict:
         """
-        try:
-            extract_data=self.extract_needed_data(file_path)
-            return patentmanip.add_patent_data(*extract_data)
-        except SplitError as e:
-            logger.log(logging.WARNING,f"{e}")
-            return 1
+        1つの公開特許広報から特定の情報を抽出する。
+        公表特許公報(グローバルな出願)は、フォーマットが異なるため、使えない。
+        Parameters:
+        file_path (str): 抽出するファイルのpath
+
+        成功した場合は、抽出データのmapを返す。
+        失敗した場合は、SplitErrorを返す
+        """
+        pdf_doc=fitz.open(file_path)
+        #step1: 要約を含んだ、文書の上の部分だけを切り取る(選択図で)
+        doc_description=self._slice_patent_section(pdf_doc,r"【発明の効果】")
+        logger.log(logging.INFO,f"doc_description:{doc_description}")
+        #step2: step1のstringから、情報を抽出する。
+        #2-0 発明の詳細な説明から上と下で分ける
+        overview_or_detail=re.split(r"【\s*発明の詳細な説明\s*】.*\n",doc_description)
+        if len(overview_or_detail)!=2:
+            raise SplitError("【発明の詳細な説明】という項目が存在しない")
+        overview=re.split(r"【\s*選択図\s*】.*\n",overview_or_detail[0])[0]
+        overview_info=self._split_overview(overview,file_path)
+        detail_info=self._split_detail(overview_or_detail[1])
+        return overview_info |detail_info
+
+    def _split_overview(self,overview:str,file_path:str)->map:
+        info_dict={}
+        basicinfo_or_abstract=re.split(r"【\s*要\s*約\s*】.*\n",overview)
+        if len(basicinfo_or_abstract)!=2:
+            raise SplitError("【要約】が存在しない")
+        basic_info=basicinfo_or_abstract[0]
+        abstract=re.sub(r"\n","",basicinfo_or_abstract[1])
+        #*【選択図】があるが、要約から離れた位置に存在している場合、または[化*]が存在するときlen(m)!=2
+        #* ただし、これらの例外は13/3050
+        #* 【が2つのときも、[効果]や[構成]のようなときがあるが、この例外も7/3050
+        #* 問題を分解する教師あり分類器の都合上、課題と解決手段が存在している特許だけを受け付ける
+        #2-2 要約を課題と手段に分ける 
+        split_list=re.split(r"【\w*課題】|【\w*手段】",abstract)
+        if(len(split_list)!=3):
+            raise SplitError(f"要約が課題と手段に分かれていない split_len={str(len(split_list))}")
+        info_dict['problem']=split_list[1]
+        info_dict['solve_way']=split_list[2]
+        #step3 step1のstringから基本的な特許情報を抽出する
+        basic_info_list=re.split("【発明の名称】|Int\.Cl.+\n",basic_info)
+        if(len(basic_info_list)!=3):
+            logger.log(logging.DEBUG,f"{str(len(split_list))}\nfile_path={file_path}")
+        info_dict['invent_name']=re.match(".+",basic_info_list[2]).group()
+        #3-1 出願番号を取得する
+        if extracted_number:=re.search(r'特願(\d{4})-(\d+)',basic_info_list[1]):
+            year = extracted_number.group(1)
+            number = int(extracted_number.group(2))
+            info_dict['apply_number'] = f"{year}{number:06}"
+        else:
+            raise SplitError("出願番号が存在しない") 
+        #3-2 IPC class_listを取得する
+        ipc_class_str=re.split("\nＦＩ",basic_info_list[1])[0]
+        info_dict['ipc_class_list']=self._convertClassStrToList(ipc_class_str)
+        #3-3 出願日を取得する(Date型で格納する)
+        if date_list:=re.search(r"\(22\)[^\(]+\((\d+)\.(\d+)\.(\d+)\)\n",basic_info_list[1]):
+            info_dict['apply_date']=datetime.datetime(int(date_list.group(1)),int(date_list.group(2)),int(date_list.group(3)))
+        else:
+            raise SplitError("出願日が存在しない") 
+        return info_dict
+    
+    def _split_detail(self,detail:str)->map:
+        info_dict={}
+        detail=re.split(r"\s*【発明が解決しようとする課題】\s*",detail)[1]
+        detail,cnt1=re.subn(r"【\d+】\n","",detail)
+        detail,cnt2=re.subn(r"10\n20\n30\n40\n50\n","",detail)
+        detail,cnt3=re.subn(r"\(\d+\)\n.+\n","",detail)
+        detail_list=re.split(r"【課題を解決するための手段】",detail)
+        logger.log(logging.INFO,f"cnt1:{cnt1} cnt2:{cnt2} cnt3:{cnt3}")
+        if len(detail_list)!=2:
+            raise SplitError("【課題を解決するための手段】が存在しない")
+        info_dict['detail_problem']=detail_list[0]
+        info_dict['detail_solve_way']=detail_list[1]
+        return info_dict
+
+    def _convertClassStrToList(self,ipc_class_str)->list[str]:
+        """class_strから、単一のキーワードのリストに変換する"""
+        class_list=[]
+        raw_class_list=re.split("\n",ipc_class_str)
+        for raw_keycode in raw_class_list:
+            keycode=re.sub("\s+\(.+\)","",raw_keycode)
+            class_list.append(keycode)
+        return class_list
     
     def _make_flat(self, folder_path: str):
         """
@@ -840,8 +932,23 @@ class expOperator:
         """
         db_query=patentQuery(collection_name="patents")
         res_list=db_query.get_parameter_counts()
+        cnt=0
         for res in res_list:
+            cnt+=res[1]
             logger.log(logging.INFO,res)
+        logger.log(logging.INFO,f"パラメータ総計:{cnt}")
+            
+    def aggr_classified_function_classes(self):
+        """_summary_ 分類されたfunction_classesの数を集計して、logに出力する
+        
+        """
+        db_query = patentQuery(collection_name="patents")
+        res_list = db_query.get_function_class_counts()
+        cnt=0
+        for res in res_list:
+            cnt+=res[1]
+            logger.log(logging.INFO, res)
+        logger.log(logging.INFO,f"クラス総計:{cnt}")    
 
 class patentProcessor:
     def __init__(self):
@@ -864,6 +971,10 @@ class patentProcessor:
     def categorize_functions(self,max_doc=None,is_write=True,is_collect=False,is_process=True):
         self._process_documents("categorize_functions", max_doc, is_write,is_collect,is_process)
                 
+    def add_heading(self,max_doc=None,is_write=True,is_collect=False,is_process=True):
+        self._process_documents("add_heading", max_doc, is_write,is_collect,is_process)
+                
+    # ?これなんで必要なんだっけ?
     def _prepare_data(self, part_doc_list, config):
         # 各プロセス固有のデータ準備
         if config['prefix'] == 'dismantle':
@@ -872,6 +983,8 @@ class patentProcessor:
             return [{"invent_name":d["invent_name"], "problem":d["problem"]} for d in part_doc_list]
         elif config['prefix'] == 'categorize':
             return [{"object":d["object"]} for d in part_doc_list]
+        elif config['prefix'] == 'add_heading':
+            return [{"id":d["id"],"apply_num":d["apply_number"],"object":d["object"],"parameter":d["parameter"],"param_explanation":d["param_explanation"],"solve_way":d["solve_way"]} for d in part_doc_list]
 
     def _process_documents(self, process_type, max_doc=None,is_write=True,is_collect=False,is_process=False):
         """ GPTのAPIを呼び出す形で、mongoDBのデータを加工する
@@ -901,25 +1014,129 @@ class patentProcessor:
                 output_data = gpt_function(processing_data, is_collect)
             else:
                 for idx, data in enumerate(processing_data):
-                    logger.log(logging.INFO, f"{idx+1}.{data['object']}")
-                print()
+                    info=f"{idx+1}."
+                    for k,v in data.items():
+                        info+=f"\n{k}:{v}"
+                    logger.log(logging.INFO,info)
                 continue
             
+            logger.log(logging.INFO, f"[抽象クラス分けの結果]\n{output_data}")
             if is_write:
                 self._write_to_db(id_list, output_data, config)
-            else:
-                logger.log(logging.INFO, f"{output_data}")
+                logger.log(logging.INFO, f"Updated {len(id_list)} documents")
         
     def _write_to_db(self, id_list, output_data, config):
         # DBに書き込み
         update_function = getattr(self.db_updater, config['update_function'])
         update_function(id_list, output_data)
+            
+class patentUrlFetcher:
+    def __init__(self):
+        self.token = None
+        self.config = self._load_config()['patent_office']
+        self.token_expiry_time = None
+        self.token_expiry_duration = 3000  # トークンの有効期限（秒）
         
-    def tmp(self):
-        doc_list=self.db_query.get_documents_without_function_classes(50)
-        for idx,doc in enumerate(doc_list):
-            logger.log(logging.INFO,f"{idx+1}.{doc['object']}")
+    def _load_config(self):
+        with open('config/config.json', 'r') as file:
+            return json.load(file)
+        
+    def get_url_to_full_page(self, apply_number: str) -> str:
+        token = self._get_valid_token()
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+        
+        api_url = f"https://ip-data.jpo.go.jp/api/patent/v1/jpp_fixed_address/{apply_number}"
+        response = requests.get(api_url, headers=headers)
+        
+        if response.status_code == 200:
+            data_dict = response.json()["result"]
+            if int(data_dict["statusCode"]) == 100:
+                remain_access=data_dict["remainAccessCount"]
+                url=data_dict["data"]["URL"]
+                logger.log(logging.INFO,f"出願番号:{apply_number}\n取得したURL: {url} \n残りアクセス回数:{remain_access}")
+                return url
+            else:
+                error_message = data_dict["errorMessage"]
+                raise Exception(f"APIエラー: {error_message}")
+        else:
+            raise Exception(f"URLの取得に失敗しました: ステータスコード {response.status_code}")
 
+    def _auth(self):
+        username = self.config['username']
+        password = self.config['password']
+        
+        if not username or not password:
+            raise ValueError("PATENT_OFFICE_USERNAME または PATENT_OFFICE_PASS が設定されていません")
+
+        data = {
+            "grant_type": "password",
+            "username": username,
+            "password": password
+        }
+
+        token_url = "https://ip-data.jpo.go.jp/auth/token"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+
+        response = requests.post(token_url, data=data, headers=headers)
+
+        if response.status_code == 200:
+            self.token = response.json().get("access_token")
+            self.token_expiry_time = time.time() + self.token_expiry_duration
+            logger.log(logging.INFO,"トークンの取得に成功しました")
+        else:
+            raise Exception(f"トークンの取得に失敗しました: ステータスコード {response.status_code}")
+
+    def _get_valid_token(self):
+        if self.token is None or time.time() >= self.token_expiry_time:
+            self._auth()
+        return self.token
+
+def update_documents_with_full_url(max_doc: int = None,
+                                   batch_size: int = 50,is_write=True):
+    """
+    full_urlを持たないdocumentを更新するメソッド。apply_numberを使ってURLを取得し、ドキュメントを更新する。
+    引数:
+        max_doc (int): 更新するdocumentの最大数 (デフォルトはNone)
+    """
+    patent_office_connector = patentUrlFetcher()
+    db_reader = patentQuery(collection_name="patents")
+    db_updater = patentBulkUpdater(collection_name="patents")
+    documents = db_reader.get_documents_without_full_url(max_doc)
+    id_list = []
+    url_list = []
+    for doc in documents:
+        doc_id=doc['id']
+        apply_number = doc['apply_number']
+        try:
+            full_url = patent_office_connector.get_url_to_full_page(apply_number)
+            id_list.append(doc_id)
+            url_list.append({'full_url': full_url})
+            if len(id_list) >= batch_size and is_write:
+                db_updater.bulk_update_full_url(id_list, url_list)
+                logger.log(logging.INFO, f"Updated {len(id_list)} documents")
+                id_list.clear()
+                url_list.clear()
+        except Exception as e:
+            logger.log(logging.WARNING,f"Failed to update document {doc['id']} with apply_number {apply_number}: {e}")
+    # 残りのドキュメントをバルク更新
+    if id_list and is_write:
+        db_updater.bulk_update_full_url(id_list, url_list)
+        logger.log(logging.INFO, f"Updated {len(id_list)} documents")
+        
+def search_patents(query:str):
+    dammy=patentManager("patents")
+    result=dammy.tmp_func(query)
+    return result
+
+def make_new_abstracts():
+    dammy=abstractAdmin()
+    doc_num=dammy.transfer_parameters()
+    logger.log(logging.INFO,f"abstractへの転送を完了。{doc_num}個のドキュメントを処理。")
+    
 def remove_all_documents_with_same_invent_name_and_problem():
     """
     特定のコレクションの全ドキュメントから同じinvent_nameとproblemを持つ

@@ -1,15 +1,14 @@
 from flask import Blueprint, request, jsonify
-import services.api_service as patent_service
+import services.service as service
+import logging
 
 patents_blueprint = Blueprint('api', __name__)
+logger = logging.getLogger(__name__)
+#api層では、サービス層の関数を1つ呼び出して、結果を返すだけ
 
 @patents_blueprint.route('/search', methods=['GET'])
 def search_patents():
-    query = request.args.get('query')
-    results = patent_service.search_patents(query)
+    query = request.args.get('q')
+    results = service.search_patents(query)
+    logger.log(logging.INFO, f"search_patents: {results}")
     return jsonify(list(results))
-
-@patents_blueprint.route('/<id>', methods=['GET'])
-def get_patent(id):
-    patent = patent_service.get_patent_by_id(id)
-    return jsonify(patent)

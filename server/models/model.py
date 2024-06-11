@@ -3,6 +3,7 @@ from pymongo.errors import BulkWriteError
 from bson.objectid import ObjectId
 from datetime import datetime
 from pprint import pprint
+import json
 
 #* 複数回のCRUD操作には、pipelineを使用し、複数の挿入操作にはbulk処理を使用すること
 
@@ -22,14 +23,32 @@ class databaseConnector:
         self.db_client = MongoClient()
         self.collection = self.db_client[db_name][collection_name]
         
+class DualCollectionConnector(databaseConnector):
+    """
+    2つのコレクションを扱う共通機能を提供するクラス。
+    """
+    def __init__(self, collection_name, collectionB_name="abstracts", db_name="analogie_finder"):
+        """
+        指定されたデータベースと2つのコレクションを用いてDualCollectionConnectorを初期化します。
+
+        引数:
+            collection_name (str): 基本はpatentsコレクション
+            collectionB_name (str): 基本はabstractsコレクション
+            db_name (str): データベースの名前。デフォルトは 'analogie_finder'。
+        """
+        super().__init__(collection_name, db_name)  # 親クラスのコンストラクタを呼び出す
+        self.collectionB = self.db_client[db_name][collectionB_name]
+        
 class patentManager(databaseConnector):
     """
     特許データの追加と基本的な取得を担当するクラス。
     特定のIDやキーに基づいたものを担当する
     """
-    def add_patent_data(self, apply_number: str, invent_name: str, problem: str, solve_way: str, ipc_class_code_list: list[str], apply_date: datetime) -> int:
+    
+    # TODO 0なら成功といいつつ、絶対に0が返るので、なんとかすること
+    def add_patent_data(self, patent_data:map) -> int:
         """
-        特許データをデータベースに追加します。既に存在するapply_numberがある場合は、追加せずに通知します。
+        特許データをデータベースに追加します。
 
         引数:
             apply_number (str): 特許申請番号、主キー
@@ -39,20 +58,24 @@ class patentManager(databaseConnector):
             abstract (str): 要約
 
         戻り値:
-            int: 処理結果を示すコード。既に存在する場合は2、新規追加の場合は0。
+            int: 処理結果を示すコード。0なら成功
         """
-        if self.collection.find_one({'apply_number': apply_number}):
-            return 2
-
-        patent_data = {
+        apply_number = patent_data['apply_number']
+        data = {
             'apply_number': apply_number,
-            'invent_name': invent_name,
-            'problem': problem,
-            'solve_way': solve_way,
-            'ipc_class_code_list': ipc_class_code_list,
-            'apply_date': apply_date,
+            'invent_name': patent_data['invent_name'],
+            'problem': patent_data['problem'],
+            'detail_problem': patent_data['detail_problem'],
+            'solve_way': patent_data['solve_way'],
+            'detail_solve_way': patent_data['detail_solve_way'],
+            'ipc_class_code_list': patent_data['ipc_class_code_list'],
+            'apply_date': patent_data['apply_date']
         }
-        self.collection.insert_one(patent_data)
+        self.collection.update_one(
+            {'apply_number': apply_number},
+            {'$set': data},
+            upsert=True
+        )
         return 0
     
     def get_summary(self, appli_num: str) -> str:
@@ -87,6 +110,17 @@ class patentManager(databaseConnector):
             return document["brief_summary"]
         else:
             return ""  # 空文字を返す
+        
+    def tmp_func(self,query):
+        # full_url属性を持つドキュメントを20個取得
+        documents = self.collection.find(
+            {"full_url": {"$exists": True}},
+            {"problem": 1, "full_url": 1}
+        ).limit(20)
+
+        # 結果をリストとして整形して返す
+        result = [{"id":str(doc.get("_id")), "title": doc.get("problem"), "url": doc.get("full_url"),"content":" "} for doc in documents]
+        return result
 
     def set_brief_summary(application_number: str, brief_summary: str):
         pass
@@ -99,6 +133,7 @@ class patentQuery(databaseConnector):
     #* バッチ処理ファイル作成のためにDBから特定のデータを取り出す関数は、すべて同じ引数の形に保ち、このクラスに置くこと。(max_docのみを取る)
     #* これは、config/process_config.jsonに記載されたget_documents_funcを指している
     #* 現在なら、~dont_have_span_problem_listと~without_parametersの2つ
+    
     def get_all_problems_dont_have_span_problem_list(self, max_doc: int) -> list[dict[str, str]]:
         """
         span_problem_listを持たないすべてのdocumentから、_idとproblemを抽出して、listで返すメソッド。
@@ -121,6 +156,26 @@ class patentQuery(databaseConnector):
             ).limit(max_doc)
 
         return [{'id': doc['_id'], 'problem': doc['problem']} for doc in problems]
+    
+    def get_documents_without_full_url(self, max_doc: int = None) -> list[dict[str, str]]:
+        """
+        full_urlを持たないすべてのdocumentから、_idとapply_numberを抽出して、listで返すメソッド。
+
+        引数:
+            max_doc (int): 取得するdocumentの最大数 (デフォルトはNone)
+
+        戻り値:
+            list[dict[str, str]]: _idとapply_numberを持つdocumentのリスト
+        """
+        query = {'full_url': {'$exists': False}}
+        projection = {'_id': 1, 'apply_number': 1}
+
+        if max_doc is None:
+            documents = self.collection.find(query, projection)
+        else:
+            documents = self.collection.find(query, projection).limit(max_doc)
+
+        return [{'id': doc['_id'], 'apply_number': doc['apply_number']} for doc in documents]
 
     def get_documents_without_parameters(self, max_doc: int) -> list[dict[str, str, str]]:
         """
@@ -168,6 +223,44 @@ class patentQuery(databaseConnector):
         
         return [{"id": doc["_id"], "object": doc["object"]} for doc in documents]    
 
+    def get_documents_without_heading(self, max_doc=None):
+        pipeline = [
+            {
+                "$lookup": {
+                    "from": "abstracts",
+                    "localField": "_id",
+                    "foreignField": "original_id",
+                    "as": "abstracts"
+                }
+            },
+            {
+                "$unwind": "$abstracts"
+            },
+            {
+                "$match": {
+                    "abstracts.heading": {"$exists": False},
+                    "abstracts.parameter": {"$ne": "0"}
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "apply_number": 1,
+                    "id":"$abstracts._id",
+                    "solve_way": 1,
+                    "object": 1,
+                    "parameter":"$abstracts.parameter",
+                    "param_explanation":"$abstracts.parameter_explain"
+                }
+            }
+        ]
+
+        if max_doc is not None:
+            pipeline.append({"$limit": max_doc})
+
+        results = self.collection.aggregate(pipeline)
+        return list(results)
+         
     def get_parameter_counts(self):
         """
         parameters(stringのlist)が存在するすべてのdocumentから、parameter(string)を個別に取り出し、
@@ -185,8 +278,26 @@ class patentQuery(databaseConnector):
 
         results = self.collection.aggregate(pipeline)
         return [[result["para_num"], result["count"]] for result in results]
+    
+    def get_function_class_counts(self):
+        """
+        function_classes(stringのlist)が存在するすべてのdocumentから、function_class(string)を個別に取り出し、
+        各stringがそれぞれいくつあるかを[string, count]としたリストとして返す。
 
-class patentBulkUpdater(databaseConnector):
+        Returns:
+            list: 抽象的な機能とその出現回数のリスト。
+        """
+        pipeline = [
+            { "$unwind": "$function_classes" },  # 配列を展開し、各要素を個別のドキュメントとして扱う
+            { "$group": { "_id": "$function_classes", "count": { "$sum": 1 } } },  # 各機能ごとにカウント
+            { "$addFields": { "fnc_class": {"$toInt":"$_id" }} },  # _idをfnc_classフィールドに追加
+            { "$sort": { "fnc_class": 1 } }  
+        ]
+
+        results = self.collection.aggregate(pipeline)
+        return [[result["fnc_class"], result["count"]] for result in results]
+
+class patentBulkUpdater(DualCollectionConnector):
     """
     特許データの一括更新を担当するクラス。
     """
@@ -229,6 +340,65 @@ class patentBulkUpdater(databaseConnector):
         except BulkWriteError as bwe:
             pprint(bwe.details)
 
+    def bulk_update_full_url(self, id_list: list[ObjectId], url_list: list[dict]):
+        """
+        与えられたid_listの数だけ、一気にfull_urlを追加する。現在の挙動では、10件ごとに処理することが期待される。
+        また、順序なしのbulk操作であるため、エラーを拾うこと。
+
+        引数:
+            id_list (list[ObjectId]): 更新対象のドキュメントIDリスト
+            url_list (list[dict]): id_listのIDに対応したfull_urlを持つdictのリスト
+        """
+        operations = [
+            UpdateOne({'_id': id_list[i]}, {'$set': {'full_url': url_list[i]['full_url']}})
+            for i in range(len(id_list))
+        ]
+        try:
+            self.collection.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            pprint(bwe.details)
+            
+    def bulk_update_function_classes(self, id_list: list[ObjectId], result: dict):
+        """
+        与えられたid_listの数だけ、一気にabstract_functionsを追加する。
+        現在の挙動では、50件ごとに処理することが期待される。
+        また、順序なしのbulk操作であるため、エラーを拾うこと。
+
+        引数:
+            id_list (list[ObjectId]): 更新対象のドキュメントIDリスト
+            result (dict): abstract_functionsの結果を持つ辞書
+        """
+        abstract_functions = result['abstract_functions']
+        operations = [
+            UpdateOne({'_id': id_list[i]}, {'$set': {'function_classes': abstract_functions[i]['result']}})
+            for i in range(len(id_list))
+        ]
+        try:
+            self.collection.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            pprint(bwe.details)
+            
+    def bulk_update_heading(self, id_list: list[ObjectId], result: dict):
+        """
+        \n与えられたid_listの数だけ、一気にheadingを追加する。これは、abstractsコレクション(collection B)に対して行う。
+        \n現在の挙動では、15件ごとに処理することが期待される。
+        \nまた、順序なしのbulk操作であるため、エラーを拾うこと。
+
+        引数:
+            id_list (list[ObjectId]): 更新対象のドキュメントIDリスト
+            result (dict): headingの結果を持つ辞書
+            例){"headings": [{"result": "heading1"}, {"result": "heading2"}, ...]}
+        """
+        headings = result['headings']
+        operations = [
+            UpdateOne({'_id': id_list[i]}, {'$set': {'heading': headings[i]['result']}})
+            for i in range(len(id_list))
+        ] 
+        try:
+            self.collectionB.bulk_write(operations, ordered=False)
+        except BulkWriteError as bwe:
+            pprint(bwe.details)
+        
 class patentCleaner(databaseConnector):
     """
     特許データの削除に関連する仕事を行うクラスです。
@@ -279,3 +449,44 @@ class patentCleaner(databaseConnector):
         """
         if ids:
             self.collection.delete_many({"_id": {"$in": ids}})
+
+class abstractAdmin(DualCollectionConnector): 
+    def _load_data(self):
+        with open('other_json_data/improve_parameteres.json', 'r',encoding='utf-8') as file:
+            return json.load(file)
+
+    def transfer_parameters(self):
+        """
+        collectionAからparametersを持つドキュメントを取り出し、collectionBに新しいドキュメントを作成します。
+        新しいドキュメントはcollectionAの_idとparameterを持ち、parameter_explainフィールドを追加します。
+        処理したドキュメントの数を返します。
+        """
+        documents = self.collection.find({"parameters": {"$exists": True}, "does_insert_to_abst": {"$ne": True}})
+        cnt = 0
+
+        for doc in documents:
+            original_id = doc['_id']
+            parameters = doc['parameters']
+            
+            if isinstance(parameters, list):
+                for parameter in parameters:
+                    explanation = self.parameters_explanation[str(parameter)]
+                    new_doc = {
+                        "original_id": original_id,
+                        "parameter": parameter,
+                        "parameter_explain": explanation
+                    }
+                    self.abst_collection.insert_one(new_doc)
+            else:
+                explanation = self.parameters_explanation[str(parameters)]
+                new_doc = {
+                    "original_id": original_id,
+                    "parameter": parameters,
+                    "parameter_explain": explanation
+                }
+                self.abst_collection.insert_one(new_doc)
+            
+            self.collection.update_one({"_id": original_id}, {"$set": {"does_insert_to_abst": True}})
+            cnt += 1
+        
+        return cnt
