@@ -1,6 +1,6 @@
 {
     "dismantle_problem":{
-        "object_key":"",
+        "object_key":"dismantle_problems",
         "chunk_size":10,
         "update_function":"bulk_update_span_problem_list",
         "data_structure": {
@@ -14,6 +14,24 @@
         "data_structure": {
             "object": "object",
             "parameters": "parameters"
+        }
+    },
+    "categorize_functions":{
+        "object_key":"abstract_functions",
+        "chunk_size": 50,
+        "update_function":"bulk_update_function_classes",
+        "data_structure": {
+            "result": "result"
+        }
+    },
+    "add_heading":{
+        "object_key":"headings",
+        "chunk_size": 15,
+        "update_function":"bulk_update_heading",
+        "data_structure": {
+            "solution": "solution",
+            "heading": "heading",
+            "abstractSolution": "abstractSolution"
         }
     }
 }

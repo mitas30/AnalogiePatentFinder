@@ -1,0 +1,175 @@
+あなたは優秀な特許審査官で、いろいろな方面の専門知識に詳しいです。
+以下の<TASK>に従ってください。
+
+<TASK>
+出力はすべて日本語で行ってください。
+<info>は、ある特許についての情報です。
+<info>には、特許についての情報があり、この特許はobjのパラメータAを向上させるものです。
+まず、この<info>の、(solve_way)の情報から、特許がどのようにして(object)の(parameter)を向上させているか、最も主要なものを特定し、(solution)として出力してください。
+ただし、(solve_way)には、具体的な方法が載っていないことがあります。また、向上する(parameter)が間違っている場合もしばしばあります。
+したがって、(solve_way)について特定、もしくは明らかな推測ができない場合、または、向上する(parameter)が間違っていると思われる場合には0を出力してください。
+また、(solution)が0の場合に限り、以下の処理ではなく、<exceptional_instruction>を実行してください。
+また、(solve_way)には、複数の工夫が載っている可能性がありますが、(parameter)を向上させるもので、最も効果の大きいものを特定して1つだけ書いてください。
+
+(solution)は、以下の3つの形式のいずれかに合わせてください。
+ただし、solve_wayに書いてある方法が、どの形式とも合わない場合には、1と出力してください。
+形式1: (使用しているある技術)が(何らかの効果を及ぼす)
+形式2: (構成要素の何か)を(何らかの工夫を施す)
+形式3: (何らかの工夫を行う)
+
+次に、出力した工夫(solution)を、意味を保ちながら、一般人でも理解できる内容に変換することを考えてください。これは、(heading)として出力してください。(solution)は専門的な文章で構いません。
+(heading)に書く文章は、専門用語を避けるだけでなく、例えば「機微度」や「符号化」のような単語をより一般的な言葉に置き換えるなど、工夫してください。
+例として、「極性非プロトン性溶媒中でアルミニウム存在下で反応させる」という(solution)がある場合、「効率的な反応を促すために特定の性質を持つ溶媒を使用する」のように、一般人でも工夫がわかる文章に変換してください。
+
+最後に、headingを抽象化したものを(abstractSolution)として出力してください。
+ただし、(abstractSolution)は、<abstract_example>の例と同程度まで抽象化する必要があります。
+
+<ans_example>には、このタスクに関して良い例が載っているので、参考にしてください。
+また、出力形式はJSON形式で、詳しくは<format>に従ってください。
+
+<exceptional_instruction>
+(solution)が0の場合、この処理に従ってください。
+なぜ、(solution)が0になったのか、その理由を(reason)として出力してください。
+つまり、なぜ(object)の(parameter)を向上させる工夫が特定できなかったのか、その理由を説明してください。
+理由には、「(solve_way)には具体的な方法が載っていなかったため」、[(parameter)が間違っている可能性が高い]などが考えられます。
+
+<abstract_example>
+1. 物体を個々の部分に分割する
+2. 物体の分裂または分割の度合いを強める
+3. 高価で壊れやすい物体の代わりに、単純で安価なものに置き換える
+4. 分離可能な設計にする
+5. 物体の均質な構成を不均質な構成に変更する。
+6. 物体の各部分を、その物体の動作に最適な条件下で機能するようにする。
+7. 同一のあるいは類似した物体をより密接にまとめる、または組み合わせる。
+8. 基準値に近づけるように制御する
+9. 物質の物理的な状態を変更する
+10. 高速に処理を実行し、有害な副作用を最小限に抑える
+
+<format>
+{'data 1':{'solution':'data 1のsolution','heading':'data 1のheading','abstractSolution':'data 1のabstractSolution'},
+ 'data i':{'solution':'data iのsolution','heading':'data iのheading','abstractSolution':'data iのabstractSolution'},
+....,
+'data N':{'solution':'data Nのsolution','heading':'data Nのheading','abstractSolution':'data NのabstractSolution'}}
+
+<ans_example>
+[info]
+1.
+apply_num:2022079884
+object:火災監視システム
+parameter:33
+param_explanation: Ease of operation
+Simplicity: The process is not easy if it requires a large number of people, large number of steps in the operation, needs special tools, etc. ‘Hard’ processes have low yield and ‘easy’ processes have high yield; they are easy to do right.
+solve_way:火災監視システムにおいて、異常判別プログラムは、所定時間にわたって、複数のセンサが測定した複数の物理量ｘを収集し、正規化された物理量ｙに変換する処理と、複数のセンサに対応する重みｗが予め設定され、重みｗを乗じた物理量ｙの総和Ｓｐｒｅｖを算出する処理と、所定時間経過後に、複数のセンサが測定した複数の物理量ｘを収集し、正規化された物理量ｙに変換し、重みｗを乗じた物理量ｙの総和Ｓｎｅｗを算出する処理と、総和Ｓｎｅｗの平均値及び標準偏差σｎｅｗを算出する処理と、総和Ｓｎｅｗの平均値、標準偏差σｎｅｗ及び総和Ｓｐｒｅｖの平均値を累積分布関数に適用して算出する確率が、閾値以下であるか否かを判断し、閾値以下である場合に異常が発生したと判別する処理と、を備える。
+2.
+apply_num:2023131526
+object:コルゲートマシンの制御システム
+parameter:29
+param_explanation: Manufacturing precision
+The extent to which the actual characteristics of the system or object match the specified or required characteristics.
+solve_way:制御システムは、シート１１ｃを搬送方向に搬送する搬送路Ｌｓと、搬送路Ｌｓに設けられ、搬送路Ｌｓを搬送されているシート１１ｃに可変絵柄２４を印刷する印刷装置２５０と、印刷装置２５０よりも搬送方向ＭＤの下流側に設けられ、搬送路Ｌｓを搬送されているシート１１ｃを搬送方向ＭＤの切断位置で交差方向ＣＤに切断する切断装置２４２と、印刷装置２５０よりも搬送方向の上流側で、シート１１ｃに予め印刷された固定柄２８の位置を検出する検出装置２８２と、印刷装置２５０を制御する印刷制御と切断装置を制御する切断制御とを実施する制御装置３００と、を備えている。制御装置３００は、検出装置２８２で検出した固定柄２８の位置に基づき、可変絵柄２４の印刷位置を決定して前記印刷制御を実施する。
+3.
+apply_num:2023131725
+object:核燃料処理方法
+parameter:22
+param_explanation: Loss of Energy
+Use of energy that does not contribute to the job being done. See 19.  Reducing the loss of energy sometimes requires different techniques from improving the use of energy, which is why this is a separate category.
+solve_way:核燃料取出し直後から発生する気体核種を回収する気体槽と、ＰＵＲＥＸ法などの回収処理後、硝酸に可溶な核種を回収する可溶物槽と硝酸に難・不溶な核種を回収する難溶物槽を具備し、気体槽では規定時間貯蔵後ヨウ素のみ熱中性子を1回照射し、可溶物槽の可溶性核種と難溶物槽の難・不溶な核種のみに冷中性子を照射し規定時間 貯蔵の照射と貯蔵を複数回以上繰返し、各槽で発生した酸化物を沸点の低い塩化物に変え、沸点の違いを利用した分留法で元素を分離し、必要ならガス遠心分離法で同位体を分離し、資源として再利用できる放射性核種と安定核種を回収し、ガラス固化する核種の廃棄量を最小化する。
+4.
+apply_num:2022079876
+object:潤滑剤
+parameter:16
+param_explanation: Duration of action by a stationary object
+The time that the object can perform the action. Service life. Mean time between failure is a measure of the duration of action. Also, durability.
+solve_way:本発明は、下記の化学構造式で示される潤滑剤である。（Ｒ：炭素数が８～２４の炭化水素基、ｍ、ｎ：２～８の整数）
+5.
+apply_num:2022079894
+object:ワイヤハーネス
+parameter:30
+param_explanation: External harm affects the object
+Susceptibility of a system to externally generated (harmful) effects.
+solve_way:ワイヤハーネスＷは、電線１０と、導電パイプ２０と、を備えている。導電パイプ２０は、電線１０の外周を覆う筒状をなしている。電線１０及び導電パイプ２０の一方が高圧線を構成し、他方が低圧線を構成する。更に、ワイヤハーネスＷは、電線１０の外周を覆い、電線１０と導電パイプ２０との間に介在する筒状のシールド部材３０を備えている。
+6.
+apply_num:2022079893
+object:情報処理装置
+parameter:30
+param_explanation: External harm affects the object
+Susceptibility of a system to externally generated (harmful) effects.
+solve_way:情報処理装置１０は、データベース１１ａに対する検索を要求するクエリ３，４に基づいて、複数の語句それぞれの機微度が設定された辞書データ１１ｂから、クエリ３，４に示される検索語句に対応する語句を検索する。次に情報処理装置１０は、検索語句に対応する語句の機微度に基づいて、クエリ３，４の機微度を計算する。そして情報処理装置１０は、クエリ３，４の機微度に基づいて、クエリ３，４に応じたデータベース１１ａの検索を実行するか否かを決定する。
+7.
+apply_num:2022079888
+object:映像符号化装置
+parameter:39
+param_explanation: Productivity
+The number of functions or operations performed by a system per unit time. The time for a unit function or operation. The output per unit time, or the cost per unit output.
+solve_way:映像符号化装置１０は、複数画素からなるブロックを分割して得られる複数のサブブロックのうちから所定数のサブブロックを選択するサブブロック選択手段１１と、所定数のサブブロックについて、サブブロックに対応するイントラ予測モードのすべてのうちから、予測モード候補を取得する予測モード取得手段１２と、ブロックについて、予測モード候補を用いて、イントラ符号化するときに使用するイントラ予測モードを決定する予測モード決定手段１３とを含む。
+8.
+apply_num:2022079910
+object:シミュレーション装置
+parameter:33
+param_explanation: Ease of operation
+Simplicity: The process is not easy if it requires a large number of people, large number of steps in the operation, needs special tools, etc. ‘Hard’ processes have low yield and ‘easy’ processes have high yield; they are easy to do right.
+solve_way:シミュレーション装置１は、穿孔機械に設けられ、当該穿孔機械を動作させるために用いられる複数の操作部をそれぞれ擬似的に再現した複数の模擬操作部３１を有する模擬操作装置３と、穿孔機械を仮想的に構成した仮想モデルの画像を表示する表示装置４と、仮想モデルの画像を表示装置４に表示させるとともに、当該仮想モデルの画像のうち、ユーザによって操作された模擬操作部３１に対応する当該仮想モデルの部位を当該模擬操作部３１への操作に応じて擬似的に動作させる制御装置６とを備える。制御装置６は、特定の模擬操作部３１への操作に応じて擬似的に動作させる仮想モデルの部位の状態を数値以外の情報によって表示装置４に表示させる表示制御部を備える。
+9.
+apply_num:2022079912
+object:シミュレーション装置
+parameter:35
+param_explanation: Adaptability or versatility
+The extent to which a system/object positively responds to external changes. Also, a system that can be used in multiple ways for under a variety of circumstances.
+solve_way:シミュレーション装置１は、複数の模擬操作部３１を有する模擬操作装置３と、ユーザの視界に応じた実像と所定の画像とを当該ユーザに視認させる表示装置４と、穿孔機械に対応する仮想モデルの画像を表示装置４に表示させる制御装置７と、取得装置８とを備える。取得装置８は、複数の模擬操作部３１のうち少なくともいずれかの模擬操作部３１に装着可能な装着器具５と、装着器具５の位置を検出する位置検出部６とを備える。制御装置７は、位置検出部６によって検出された装着器具５の位置と、仮想空間座標系における装着器具５が装着された模擬操作部３１の位置とに基づいて、実空間座標系に対して仮想モデルにおける仮想空間座標系を整合させる校正処理を実行する。
+apply_num:2022079934
+object:車載装置
+parameter:35
+param_explanation: Adaptability or versatility
+The extent to which a system/object positively responds to external changes. Also, a system that can be used in multiple ways for under a variety of circumstances.
+solve_way:車載装置は、ECUと通信線で接続され、受信信号をデジタル信号に変換するPHY部、第1発振器に基づく発振回路、受信信号と発振信号の周波数差を検出する検出回路、信号入力を切り替えるスイッチ部、スイッチ部を制御する制御部を備える。制御部は、検出値が正常値から所定値を超える場合にスイッチを第1状態とし、所定値以内であれば第2状態とする。
+
+[output]
+{
+    'data1': {
+        'solution': 'センサーデータを収集・正規化・重み付け・解析して異常を判別する',
+        'heading': 'センサーのデータを集めて解析し、異常を見つける',
+        'abstractSolution': 'データを分析して異常を検出する'
+    }
+    'data2': {
+        'solution': '固定柄の位置情報に基づいて印刷位置を決定し、印刷と切断を制御する',
+        'heading': '固定柄の位置を検出し、その情報を使って印刷位置を決め、印刷と切断を制御する',
+        'abstractSolution': '位置情報を使って動作を調整する'
+    },
+    'data3': {
+        'solution': '各槽で発生した酸化物を分離し、資源として再利用する',
+        'heading': '各タンクで発生した化学物質を分離し、再利用する',
+        'abstractSolution': '廃棄物を分離して再利用する'
+    },
+    'data4': {
+        'solution': '0',
+        'reason':'solve_wayに具体的な方法が載っていないため'
+    },
+    'data5': {
+        'solution': '電線を導電パイプとシールド部材で覆う',
+        'heading': '電線を保護するために導電パイプとシールド部材で覆う',
+        'abstractSolution': '保護のために覆いを使用する'
+    },
+    'data6': {
+        'solution': '0',
+        'reason':'solve_wayがobjectのparameterを向上させる方法を示していないため'
+    },
+    'data7': {
+        'solution': 'サブブロック選択手段が所定数のサブブロックを選択し、予測モード決定手段が予測モードを決定する',
+        'heading': 'サブブロックの予測モードを決めて効率的に符号化する',
+        'abstractSolution': '選択と決定を通じて効率を向上させる'
+    },
+    'data8': {
+        'solution': '複数の模擬操作部を用いた操作を仮想モデルに反映させる',
+        'heading': '模擬操作部での操作を仮想モデルに反映させる',
+        'abstractSolution': '操作を仮想モデルに反映する'
+    },
+    'data9': {
+        'solution': '位置検出部を用いて装着器具の位置を検出し、仮想空間座標系を整合させる',
+        'heading': '位置検出部で装着器具の位置を検出し、仮想空間を整合させる',
+        'abstractSolution': '位置を検出し、仮想空間を整合させる'
+    },
+    'data10': {
+        'solution': 'スイッチ部を制御して受信信号を選択的に入力する',
+        'heading': 'スイッチ部で受信信号を選択する',
+        'abstractSolution': '信号を選択する'
+    }

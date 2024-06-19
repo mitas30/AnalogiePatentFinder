@@ -1,9 +1,9 @@
 from pymongo import MongoClient,UpdateOne
 from pymongo.errors import BulkWriteError
 from bson.objectid import ObjectId
-from datetime import datetime
-from pprint import pprint
-import json
+import json,logging,re
+
+logger = logging.getLogger(__name__)
 
 #* 複数回のCRUD操作には、pipelineを使用し、複数の挿入操作にはbulk処理を使用すること
 
@@ -224,6 +224,17 @@ class patentQuery(databaseConnector):
         return [{"id": doc["_id"], "object": doc["object"]} for doc in documents]    
 
     def get_documents_without_heading(self, max_doc=None):
+        """ _summary_ 
+        \nsolutionが存在しないdocumentを取得する。
+        \nheadingが存在しないdocumentは、solutionが読み取れないものも含んでいるので、条件としては不適切
+        \n$lookupを使って、abstractsコレクションからsolutionを取得しているので、abstractsコレクションのあるdbを指定する必要がある
+
+        Args:
+            max_doc (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         pipeline = [
             {
                 "$lookup": {
@@ -238,7 +249,7 @@ class patentQuery(databaseConnector):
             },
             {
                 "$match": {
-                    "abstracts.heading": {"$exists": False},
+                    "abstracts.solution": {"$exists": False},
                     "abstracts.parameter": {"$ne": "0"}
                 }
             },
@@ -303,8 +314,8 @@ class patentBulkUpdater(DualCollectionConnector):
     """
     #* バッチ処理の結果をDBにいれる関数は、このクラスに置くこと。(id_listとinfo_listを取るように)
     #* これは、config/batch_config.jsonに記載されたupdate_functionを指している
-    #* 現在なら、~span_problem_listと~update_parametersの2つ
-    def bulk_update_span_problem_list(self, id_list: list[ObjectId], info_list: list[dict]):
+    #* resultは、dict[str,list[dict]]の形式であり、{"識別名":[{結果1},{結果2},...]}の形式に揃える
+    def bulk_update_span_problem_list(self, id_list: list[ObjectId], result: dict[str,list[dict]])->int:
         """
         与えられたid_listの数だけ、一気にspan_problem_listを追加する。現在の挙動では、10件ごとに処理することが期待される。
         また、順序なしのbulk操作であるため、エラーを拾うこと。
@@ -314,15 +325,17 @@ class patentBulkUpdater(DualCollectionConnector):
             info_list (list[dict]): id_listのIDに対応したspan_problem_listを持つdictのリスト
         """
         operations = [
-            UpdateOne({'_id': id_list[i]}, {'$set': {'span_problem_list': document_info['span_problem_list']}})
-            for i, document_info in enumerate(info_list)
+            UpdateOne({'_id': doc_id}, {'$set': {'span_problem_list': result.get('dismantle_problems')[i].get('span_problem_list')}})
+            for i, doc_id in enumerate(id_list)
         ]
         try:
-            self.collection.bulk_write(operations, ordered=False)
+            w_cnt=self.collection.bulk_write(operations, ordered=False).modified_count
+            return w_cnt
         except BulkWriteError as bwe:
-            pprint(bwe.details)
+            logger.log(logging.WARNING,bwe.details)
+            return 0
 
-    def bulk_update_parameters(self, id_list: list[ObjectId], info_list: list[dict]):
+    def bulk_update_parameters(self, id_list: list[ObjectId], result: dict[str,list[dict]])->int:
         """
         与えられたid_listの数だけ、一気にinfoを追加する。現在の挙動では、10件ごとに処理することが期待される。
         また、順序なしのbulk操作であるため、エラーを拾うこと。
@@ -332,15 +345,92 @@ class patentBulkUpdater(DualCollectionConnector):
             info_list (list[dict]): id_listのIDに対応したobjectとparametersを持つdictのリスト
         """
         operations = [
-            UpdateOne({'_id': id_list[i]}, {'$set': {'object': document_info['object'], 'parameters': document_info['parameters']}})
-            for i, document_info in enumerate(info_list)
+            UpdateOne({'_id': doc_id}, {'$set': {'object': result.get('object_parameters')[i].get('object'), 'parameters': result.get('object_parameters')[i].get('parameters')}})
+            for i, doc_id in enumerate(id_list)
         ]
         try:
-            self.collection.bulk_write(operations, ordered=False)
+            w_cnt=self.collection.bulk_write(operations, ordered=False).modified_count
+            return w_cnt
         except BulkWriteError as bwe:
-            pprint(bwe.details)
+            logger.log(logging.WARNING,bwe.details)
+            return 0
+            
+    def bulk_update_function_classes(self, id_list: list[ObjectId], result: dict[str,list[dict]])->int:
+        """
+        与えられたid_listの数だけ、一気にabstract_functionsを追加する。
+        現在の挙動では、50件ごとに処理することが期待される。
+        また、順序なしのbulk操作であるため、エラーを拾うこと。
 
-    def bulk_update_full_url(self, id_list: list[ObjectId], url_list: list[dict]):
+        引数:
+            id_list (list[ObjectId]): 更新対象のドキュメントIDリスト
+            result (dict): abstract_functionsの結果を持つ辞書
+        """
+        operations=[]
+        i=0
+        info_list=result['abstract_functions']
+        non_dict_datas=""
+        try:
+            for info in info_list:
+                if isinstance(info, dict):
+                    operations.append(UpdateOne(
+                        {'_id': id_list[i]},
+                        {'$set': {'function_classes': info.get('result')}}
+                    ))
+                    i+=1
+                else:
+                    non_dict_datas+=str(info)+" "
+        except IndexError as e:
+            logger.warning(f"IndexError: {e}")
+            return 0
+        if non_dict_datas!="":
+            logging.warning(f"Skipping non-dict datas : {non_dict_datas}")
+        if i!=len(id_list):
+            logging.warning(f"Number of id_list and info_list does not match. id_list:{len(id_list)}, info_list:{i}")
+            return 0
+        try:
+            w_cnt=0
+            w_cnt=self.collection.bulk_write(operations, ordered=False).modified_count
+        except BulkWriteError as bwe:
+            logger.log(logging.WARNING,bwe.details)
+            w_cnt=0
+        return w_cnt
+            
+    def bulk_update_heading(self, id_list: list[ObjectId], result: dict)->int:
+        """_summary_
+
+        Args:
+            id_list (list[ObjectId]): _description_
+            result (dict): _description_
+        
+        return: updateに成功したdocumentの数
+        """
+        operations = []
+
+        # headingsリストを取得
+        headings = result.get('headings', [])
+
+        for i, doc_id in enumerate(id_list):
+            data_entry = headings[i]
+            try:
+                update_fields = {'solution': data_entry['solution']}
+                if data_entry['solution'] == '0':
+                    update_fields['reason'] = data_entry['reason']
+                else:
+                    update_fields['heading'] = data_entry['heading']
+                    update_fields['abstractSolution'] = data_entry['abstractSolution']
+                operations.append(UpdateOne({'_id': doc_id}, {'$set': update_fields}))
+            except KeyError as key:
+                logging.warning(f"Missing key {str(key)} in data entry {data_entry}. Skipping this entry.")
+
+        logger.debug(operations)
+        try:
+            w_cnt = self.collectionB.bulk_write(operations, ordered=False).modified_count
+        except BulkWriteError as bwe:
+            logger.log(logging.WARNING, bwe.details)
+            w_cnt = 0
+        return w_cnt
+
+    def bulk_update_full_url(self, id_list: list[ObjectId], url_list: list[dict])->int:
         """
         与えられたid_listの数だけ、一気にfull_urlを追加する。現在の挙動では、10件ごとに処理することが期待される。
         また、順序なしのbulk操作であるため、エラーを拾うこと。
@@ -354,50 +444,11 @@ class patentBulkUpdater(DualCollectionConnector):
             for i in range(len(id_list))
         ]
         try:
-            self.collection.bulk_write(operations, ordered=False)
+            w_cnt=self.collection.bulk_write(operations, ordered=False).modified_count
         except BulkWriteError as bwe:
-            pprint(bwe.details)
-            
-    def bulk_update_function_classes(self, id_list: list[ObjectId], result: dict):
-        """
-        与えられたid_listの数だけ、一気にabstract_functionsを追加する。
-        現在の挙動では、50件ごとに処理することが期待される。
-        また、順序なしのbulk操作であるため、エラーを拾うこと。
-
-        引数:
-            id_list (list[ObjectId]): 更新対象のドキュメントIDリスト
-            result (dict): abstract_functionsの結果を持つ辞書
-        """
-        abstract_functions = result['abstract_functions']
-        operations = [
-            UpdateOne({'_id': id_list[i]}, {'$set': {'function_classes': abstract_functions[i]['result']}})
-            for i in range(len(id_list))
-        ]
-        try:
-            self.collection.bulk_write(operations, ordered=False)
-        except BulkWriteError as bwe:
-            pprint(bwe.details)
-            
-    def bulk_update_heading(self, id_list: list[ObjectId], result: dict):
-        """
-        \n与えられたid_listの数だけ、一気にheadingを追加する。これは、abstractsコレクション(collection B)に対して行う。
-        \n現在の挙動では、15件ごとに処理することが期待される。
-        \nまた、順序なしのbulk操作であるため、エラーを拾うこと。
-
-        引数:
-            id_list (list[ObjectId]): 更新対象のドキュメントIDリスト
-            result (dict): headingの結果を持つ辞書
-            例){"headings": [{"result": "heading1"}, {"result": "heading2"}, ...]}
-        """
-        headings = result['headings']
-        operations = [
-            UpdateOne({'_id': id_list[i]}, {'$set': {'heading': headings[i]['result']}})
-            for i in range(len(id_list))
-        ] 
-        try:
-            self.collectionB.bulk_write(operations, ordered=False)
-        except BulkWriteError as bwe:
-            pprint(bwe.details)
+            logger.log(logging.WARNING,bwe.details)
+            w_cnt=0
+        return w_cnt
         
 class patentCleaner(databaseConnector):
     """
@@ -450,7 +501,11 @@ class patentCleaner(databaseConnector):
         if ids:
             self.collection.delete_many({"_id": {"$in": ids}})
 
-class abstractAdmin(DualCollectionConnector): 
+class abstractAdmin(DualCollectionConnector):
+    def __init__(self,collection_name):
+        super().__init__(collection_name=collection_name)
+        self.parameters_explanation = self._load_data()
+ 
     def _load_data(self):
         with open('other_json_data/improve_parameteres.json', 'r',encoding='utf-8') as file:
             return json.load(file)
@@ -476,7 +531,7 @@ class abstractAdmin(DualCollectionConnector):
                         "parameter": parameter,
                         "parameter_explain": explanation
                     }
-                    self.abst_collection.insert_one(new_doc)
+                    self.collectionB.insert_one(new_doc)
             else:
                 explanation = self.parameters_explanation[str(parameters)]
                 new_doc = {
@@ -484,7 +539,7 @@ class abstractAdmin(DualCollectionConnector):
                     "parameter": parameters,
                     "parameter_explain": explanation
                 }
-                self.abst_collection.insert_one(new_doc)
+                self.collectionB.insert_one(new_doc)
             
             self.collection.update_one({"_id": original_id}, {"$set": {"does_insert_to_abst": True}})
             cnt += 1

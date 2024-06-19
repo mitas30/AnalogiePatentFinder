@@ -1,43 +1,20 @@
 #ここで全てのtestを試す app.pyと同じ設定ですべて動く
-from tests import service_test
+from server.tests.unit_test import service_test
 from setting_log.logging_config import setup_logging
+import unittest
 
 setup_logging()
 
-#* NOTE 毎回やってもよいテスト
-service_test.check_duplicate_patent()
-service_test.test_extract_one_patent()
-'''
-service_test.test_uncategorized_function_classes(10)
-service_test.show_not_headding(50)
-service_test.aggregate_parameters()
-service_test.aggregate_function_classes()
-'''
 #service_test.st_check_poffice_api(1)
+if __name__ == "__main__":
+    # 'module' フォルダ内のすべてのテストを見つけて実行します
+    loader = unittest.TestLoader()
+    suite = loader.discover(start_dir='tests',pattern='*.py')
 
-#* NOTE 毎回試すのは嫌な処理
-#service_test.show_not_headding(50)
-#service_test.categorize_and_write_function_classes(50)
-#service_test.process_function_classes_without_write(50)
-#service_test.make_exp_data()
-#service_test.st_dismantle_problem(max_doc=100)
-#service_test.st_askbatch("batch_Q402pRiglrkuFuJlxazXxkPw")
-#service_test.st_uploadfile()
-#service_test.st_makebatch("file-8at2bATRWx8wWZcfYl4gIfXZ")
-#service_test.st_checkbatch("batch_MD9hDoKfGcDzWEzggdzVvNfg")
-#service_test.st_batch_span_problem_list()
-#service_test.st_do_fine_tuning()
-#service_test.st_analyze_f_tuning("ftjob-nxZKk4v5XECKO4K4kJJczpeZ")
-#service_test.st_annotate_para()
-#service_test.st_c_and_s_impr_params()
-#service_test.st_batch_dismantle_problem(max_doc=30)
-#service_test.st_batch_c_and_s_impr_params(max_doc=300)
-#service_test.st_askbatch("batch_bBbaRdIuKTOg7I1IR9og6evd")
-#service_test.st_fetch_full_url()
-#service_test.make_new_abst()
-'''
-service_test.st_write_res_c_and_s_impr_params(
-    "annotate_memo_1716303841_0195944",
-    "batch_23qjN",
-)
-'''
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
+    """
+    service_test.check_duplicate_patent()
+    service_test.test_format_patent_datas()
+    service_test.show_not_headding(15)
+    """
