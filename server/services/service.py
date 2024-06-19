@@ -1119,7 +1119,7 @@ class expOperator:
         for res in res_list:
             cnt+=res[1]
             logger.log(logging.INFO,res)
-        logger.log(logging.INFO,f"パラメータ総計:{cnt}")
+        logger.log(logging.INFO,f"パラメータ総計:{cnt}") 
             
     def aggr_classified_function_classes(self):
         """_summary_ 分類されたfunction_classesの数を集計して、logに出力する
