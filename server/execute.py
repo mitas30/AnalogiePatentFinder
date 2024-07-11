@@ -132,13 +132,13 @@ def make_new_abstract_documents():
     service.make_new_abstracts()
     
 if __name__ == "__main__":
-    aggregate_parameters()
-    aggreate_functions()
+    #aggregate_parameters()
+    #aggreate_functions()
     #batch_categorize_function(1000)
-    #batch_add_heading()
-    #askbatch("batch_6iGU0n8j8IsQypXAvhovRjRX")
-    #check_batch_add_heading(id_filename="add_heading_oid_1718795283",output_filename="batch_QyTp7")
-    #write_batch_add_heading(id_filename="add_heading_oid_1718795283",output_filename="batch_QyTp7")
+    #batch_add_heading(150)
+    #askbatch("batch_4OaIVjD1TQ5Mp3J5H12pOBuJ")
+    #check_batch_add_heading(id_filename="add_heading_oid_1719042504",output_filename="batch_n8pWi")
+    write_batch_add_heading(id_filename="add_heading_oid_1719042504",output_filename="batch_n8pWi")
     #check_batch_categorize_function(id_filename="categorize_oid_1718797976",output_filename="batch_JHjp3")
     #write_batch_categorize_function(id_filename="categorize_oid_1718797976",output_filename="batch_JHjp3")
     

@@ -3,6 +3,7 @@ from pymongo.errors import BulkWriteError
 from bson.objectid import ObjectId
 import json,logging,re
 
+
 logger = logging.getLogger(__name__)
 
 #* 複数回のCRUD操作には、pipelineを使用し、複数の挿入操作にはbulk処理を使用すること
@@ -94,22 +95,63 @@ class patentManager(databaseConnector):
         else:
             return ""  # 要約がない場合は空文字列を返す
 
-    def get_brief_summary(self, appli_num: str) -> str:
+    def get_explanation(self, apply_num: str,parameter:str) -> dict[str,dict[str,str]]:
         """
-        要約をGPTでさらに簡単にしたものを取得する。
-        つまり、一度GPTで処理されている場合は、mongoDBからキャッシュする
+        一度作成されていた場合、出願番号と向上パラメータに基づいて、特許文書の説明を取得します。
 
-        引数:
+        Args:
+            apply_num (str): 特許の出願番号。
+
+        Returns:
+            dict[str,dict[str,str]]: 特許文書の説明。説明が存在しない場合は、空の辞書を返します。
+        """
+        pipeline=[
+        {"$match":{"apply_number":apply_num}},
+    {
+        "$lookup": {
+        "from": "abstracts",
+        "localField": "_id",
+        "foreignField": "original_id",
+        "as": "abstracts"
+        }
+    },
+    {
+        "$unwind": "$abstracts"
+    },
+    {
+        "$match": {
+        "abstracts.parameter": parameter
+        }
+    },
+    {
+        "$project": {
+            "explanation": "$abstracts.explanation"
+        }
+    }
+    ]
+        cursor=self.collection.aggregate(pipeline)
+        document=next(cursor,None)
+        if document and "explanation" in document:
+            return {"patent_explanation":{"output":document["explanation"]}}
+        else:
+            return {}
+        
+    def get_detail_info(self, apply_num: str) -> str:
+        """_summary_
+        
+        出願番号に基づいて特許文書の詳細情報を取得する。
+
+        Args:
             appli_num (str): 特許の出願番号。
 
-        戻り値:
-            str: 特許文書の要約。要約が存在しない場合は空文字列を返します。
+        Returns:
+            str: 特許文書の詳細(解決する課題と解決法)。詳細が存在しない場合は例外を投げる。
         """
-        document = self.collection.find_one({"appli_num": appli_num})
-        if document and "brief_summary" in document:
-            return document["brief_summary"]
+        document = self.collection.find_one({"apply_number": apply_num})
+        if document and "detail_solve_way" in document and "detail_problem" in document:
+            return document
         else:
-            return ""  # 空文字を返す
+            raise Exception(f"Document with appli_num {apply_num} doesn't have 'detail_problem' or 'detail_solve_way' field.\n {document}")
         
     def tmp_func(self,query):
         # full_url属性を持つドキュメントを20個取得
@@ -121,10 +163,63 @@ class patentManager(databaseConnector):
         # 結果をリストとして整形して返す
         result = [{"id":str(doc.get("_id")), "title": doc.get("problem"), "url": doc.get("full_url"),"content":" "} for doc in documents]
         return result
+    
+    def update_full_url(self, apply_number: str, full_url: str):
+        """
+        特許文書のfull_urlを更新します。
 
-    def set_brief_summary(application_number: str, brief_summary: str):
-        pass
+        Args:
+            apply_number (str): 特許の出願番号。
+            full_url (str): 特許文書のURL。
+        """
+        self.collection.update_one(
+            {"apply_number": apply_number},
+            {"$set": {"full_url": full_url}}
+        )
+
+    def is_created(self,apply_number:str,parameter:str)->bool:
+        """__summary__
         
+        特定の特許とパラメータに対応する解説が、データベースに存在するかどうかを確認します。
+
+        Args:
+            apply_number (str): 特許の出願番号。
+
+        Returns:
+            bool: 特許文書に解説が存在する場合はTrue、存在しない場合はFalse。
+        """
+        pipeline=[
+        {"$match":{"apply_number":apply_number}},
+    {
+        "$lookup": {
+        "from": "abstracts",
+        "localField": "_id",
+        "foreignField": "original_id",
+        "as": "abstracts"
+        }
+    },
+    {
+        "$unwind": "$abstracts"
+    },
+    {
+        "$match": {
+        "abstracts.parameter": parameter
+        }
+    },
+    {
+        "$project": {
+            "explanation": "$abstracts.explanation"
+        }
+    }
+    ]
+
+        cursor=self.collection.aggregate(pipeline)
+        document=next(cursor,None)
+        if "explanation" in document:
+            return True
+        else:
+            return False
+       
 class patentQuery(databaseConnector):
     """
     特許データのクエリ操作を担当するクラス。
@@ -308,6 +403,97 @@ class patentQuery(databaseConnector):
         results = self.collection.aggregate(pipeline)
         return [[result["fnc_class"], result["count"]] for result in results]
 
+    def find_patents_by_query(self, abstract_classes: list,improve_parameters: list) -> list[dict]:
+        """
+        指定されたクエリに基づいて特許文書を検索します。
+
+        引数:
+            abstract_classes (list): 抽象機能のリスト。
+            improve_parameters (list): 向上パラメータのリスト。
+
+        戻り値:
+            list[dict]: 検索結果のリスト。
+        """
+        
+        pipeline = [
+    {
+        "$match":{
+        "function_classes":{"$in":abstract_classes},
+        "parameters":{"$in":improve_parameters}
+        }
+    },
+    {
+        "$project":{
+        "detail_problem":0,
+        "detail_solve_way":0,
+        "does_insert_to_abst":0,
+        }
+    },
+    {
+    "$lookup": {
+        "from": "abstracts",
+        "localField": "_id",
+        "foreignField": "original_id",
+        "as": "abstracts"
+    }
+    },
+    {
+        "$unwind": "$abstracts"
+    },
+    {
+        "$project": {
+            "_id": 1,
+            "apply_number": 1,
+            "invent_name": 1,
+            "problem": 1,
+            "solve_way": 1,
+            "object":1,
+            "full_url":1,
+            "parameter":"$abstracts.parameter",
+            "solution":"$abstracts.solution",
+            "heading":"$abstracts.heading",
+            "abstractSolution":"$abstracts.abstractSolution",
+        }   
+    },
+    {
+        "$match":{
+            "heading":{"$exists":True},
+            "parameter":{"$in":improve_parameters}
+        }
+    },
+    {
+        "$lookup": {
+            "from": "parameters",
+            "localField": "parameter",
+            "foreignField": "code",
+            "as": "params"
+        }
+    },
+    {
+        "$addFields": {
+            "parameter_attribute": { "$arrayElemAt": ["$params.attribute", 0] },
+        }
+    },
+    {
+        "$project": {
+            "_id":1,
+            "apply_number":1,
+            "invent_name":1,
+            "heading":{"$concat":["$heading","ことで","$object","の","$parameter_attribute"]},
+            "solution":1,
+            "abstractSolution":1,
+            "problem":1,
+            "solve_way":1,
+            "full_url":1,
+            "parameter":1,
+            "parameter_attribute":1,
+            "object":1
+        }
+    }
+]
+        results = self.collection.aggregate(pipeline)
+        return list(results)
+
 class patentBulkUpdater(DualCollectionConnector):
     """
     特許データの一括更新を担当するクラス。
@@ -413,8 +599,10 @@ class patentBulkUpdater(DualCollectionConnector):
             data_entry = headings[i]
             try:
                 update_fields = {'solution': data_entry['solution']}
-                if data_entry['solution'] == '0':
+                if data_entry['solution'] == '0' or data_entry['solution'] == 0:
                     update_fields['reason'] = data_entry['reason']
+                    if data_entry['solution'] == 0:
+                        update_fields['solution'] =str(data_entry['solution'])
                 else:
                     update_fields['heading'] = data_entry['heading']
                     update_fields['abstractSolution'] = data_entry['abstractSolution']
@@ -502,6 +690,15 @@ class patentCleaner(databaseConnector):
             self.collection.delete_many({"_id": {"$in": ids}})
 
 class abstractAdmin(DualCollectionConnector):
+    """_summary_
+    
+    abstractsコレクションの管理を行うクラス。
+    abstractsコレクションは、original_idとparameterをキーに持つ
+
+    Args:
+        DualCollectionConnector (_type_): _description_
+    """
+    
     def __init__(self,collection_name):
         super().__init__(collection_name=collection_name)
         self.parameters_explanation = self._load_data()
@@ -545,3 +742,44 @@ class abstractAdmin(DualCollectionConnector):
             cnt += 1
         
         return cnt
+
+    def update_to_better_heading(self,original_id:ObjectId,parameter:str,geminis_explanation:dict[str,str])->int:
+        """_summary_
+        
+        該当するdocumentの見出しなど(3点)を更新する。
+
+        Args:
+            original_id (ObjectId): _description_
+            parameter (str): _description_
+            geminis_explanation (dict[str,str]): _description_
+            
+        Returns:
+            int: 変更されたdocumentの数
+        """
+        
+        ret=self.collection.update_one(
+            {"original_id": original_id, "parameter": parameter},
+            {"$set": {"heading": geminis_explanation["better_heading"]["output"], "abstractSolution": geminis_explanation["abstractSolution"]["output"], "solution": geminis_explanation["solution_summary"]["output"]}}
+        )
+        
+        return ret.modified_count
+        
+    def append_explanation(self,original_id:ObjectId,parameter:str,explanation:str)->int:
+        """_summary_
+        
+        特許が行ったアイデアについての説明データを、対応するdocumentに追加する。
+
+        Args:
+            original_id (ObjectId): _description_
+            explanation (str): _description_
+
+        Returns:
+            int: 変更されたdocumentの数
+        """
+        res=self.collection.update_one(
+            {"original_id": original_id,"parameter":parameter},
+            {"$set": {"explanation": explanation}}
+        )
+        
+        return res.modified_count
+        

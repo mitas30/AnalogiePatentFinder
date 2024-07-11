@@ -1,7 +1,7 @@
 #ここで全てのtestを試す app.pyと同じ設定ですべて動く
-from server.tests.unit_test import service_test
+from tests.unit_test import model_test as m_test
 from setting_log.logging_config import setup_logging
-import unittest
+import unittest,logging
 
 setup_logging()
 
@@ -13,8 +13,6 @@ if __name__ == "__main__":
 
     runner = unittest.TextTestRunner()
     runner.run(suite)
-    """
-    service_test.check_duplicate_patent()
-    service_test.test_format_patent_datas()
-    service_test.show_not_headding(15)
-    """
+    
+    res=m_test.query_test()
+    logging.info(res)

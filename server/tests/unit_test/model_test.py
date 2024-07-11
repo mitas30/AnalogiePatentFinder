@@ -75,3 +75,8 @@ class testPatentBulkUpdater(unittest.TestCase):
 
         self.mock_collectionB.bulk_write.assert_called_once_with(expected_operations, ordered=False)
 
+def query_test():
+    p=patentQuery("patents")
+    res=p.find_patents_by_query(abstract_classes=["31","32", "33", "34"],
+                            improve_parameters=["27", "28"])
+    return res

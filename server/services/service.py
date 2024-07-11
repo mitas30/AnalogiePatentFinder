@@ -1,10 +1,11 @@
-import json,logging,os,shutil,re,datetime,time,requests
+import json,logging,os,shutil,re,datetime,time
 import fitz
 from bson.objectid import ObjectId
 from typing import Literal
 from fitz import Document
 from openai import OpenAI
 from models.model import patentManager,patentQuery,patentBulkUpdater,patentCleaner,abstractAdmin
+from api_service import patentUrlFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -341,6 +342,7 @@ class gptClient:
         return batchfile_id
     
     #TODO 抽象化関数の形式に合わせる
+    #TODO すべて同じ関数として扱うことができる(行うかは不明)
     #* divide_problems関数は現在使われていない
     def divide_problems(self,problem_list:list[dict],is_collect:bool)->dict[list[str]]:
         ''' summary:\n
@@ -745,7 +747,7 @@ class gptBatch:
             
             logger.log(logging.INFO, f"request_id : {request_id}")
             for info_dict in result[batch_config['object_key']]:
-                logger.log(logging.INFO, info_dict)
+                logger.log(logging.DEBUG, info_dict)
             
             #* dbの更新
             update_function = getattr(self.db_updater, batch_config['update_function'],None)
@@ -1012,7 +1014,7 @@ class gptBatch:
         file_path="../data/openai_batch/res/batch_"+output_file_id[-5:]+".jsonl"
         with open(file_path, 'w', encoding='utf-8') as file:
             file.write(jsonl_content)
-            logger.info(f"Successfully wrote Batch_output file to {file_path}")
+            logger.info(f"outout_file: batch_"+{output_file_id[-5:]})
     
     # JSONオブジェクトを読み込むための関数
     def _read_jsonl(self,file_path):
@@ -1132,76 +1134,13 @@ class expOperator:
             cnt+=res[1]
             logger.log(logging.INFO, res)
         logger.log(logging.INFO,f"クラス総計:{cnt}")    
-            
-class patentUrlFetcher:
-    def __init__(self):
-        self.token = None
-        self.config = self._load_config()['patent_office']
-        self.token_expiry_time = None
-        self.token_expiry_duration = 3000  # トークンの有効期限（秒）
-        
-    def _load_config(self):
-        with open('config/config.json', 'r') as file:
-            return json.load(file)
-        
-    def get_url_to_full_page(self, apply_number: str) -> str:
-        token = self._get_valid_token()
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-        
-        api_url = f"https://ip-data.jpo.go.jp/api/patent/v1/jpp_fixed_address/{apply_number}"
-        response = requests.get(api_url, headers=headers)
-        
-        if response.status_code == 200:
-            data_dict = response.json()["result"]
-            if int(data_dict["statusCode"]) == 100:
-                remain_access=data_dict["remainAccessCount"]
-                url=data_dict["data"]["URL"]
-                logger.log(logging.INFO,f"出願番号:{apply_number}\n取得したURL: {url} \n残りアクセス回数:{remain_access}")
-                return url
-            else:
-                error_message = data_dict["errorMessage"]
-                raise Exception(f"APIエラー: {error_message}")
-        else:
-            raise Exception(f"URLの取得に失敗しました: ステータスコード {response.status_code}")
 
-    def _auth(self):
-        username = self.config['username']
-        password = self.config['password']
-        
-        if not username or not password:
-            raise ValueError("PATENT_OFFICE_USERNAME または PATENT_OFFICE_PASS が設定されていません")
-
-        data = {
-            "grant_type": "password",
-            "username": username,
-            "password": password
-        }
-
-        token_url = "https://ip-data.jpo.go.jp/auth/token"
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-
-        response = requests.post(token_url, data=data, headers=headers)
-
-        if response.status_code == 200:
-            self.token = response.json().get("access_token")
-            self.token_expiry_time = time.time() + self.token_expiry_duration
-            logger.log(logging.INFO,"トークンの取得に成功しました")
-        else:
-            raise Exception(f"トークンの取得に失敗しました: ステータスコード {response.status_code}")
-
-    def _get_valid_token(self):
-        if self.token is None or time.time() >= self.token_expiry_time:
-            self._auth()
-        return self.token
-
+#! 以下の関数は、現在は使用していない            
 def update_documents_with_full_url(max_doc: int = None,
                                    batch_size: int = 50,is_write=True):
     """
     full_urlを持たないdocumentを更新するメソッド。apply_numberを使ってURLを取得し、ドキュメントを更新する。
+    \n現在は、ユーザが特許の完全な情報をみたいときにオンラインで個別のURLを取得するため、この関数は使わない。
     引数:
         max_doc (int): 更新するdocumentの最大数 (デフォルトはNone)
     """
@@ -1243,7 +1182,8 @@ def make_new_abstracts():
     dammy=abstractAdmin(collection_name="patents")
     doc_num=dammy.transfer_parameters()
     logger.log(logging.INFO,f"abstractへの転送を完了。{doc_num}個のドキュメントを処理。")
-    
+
+#* バッチ処理を行うときについでに実行する関数
 def remove_all_documents_with_same_invent_name_and_problem():
     """
     特定のコレクションの全ドキュメントから同じinvent_nameとproblemを持つ
@@ -1260,45 +1200,3 @@ def remove_all_documents_with_same_invent_name_and_problem():
 
     # 重複ドキュメントの削除
     cleaner.delete_documents_by_ids(duplicate_ids)
-
-def provide_brief_summary(application_num: str) -> str:
-    """
-    特許申請番号に基づいて特許の簡潔な要約を提供する関数。
-    まず、GPTによって作成された既存の要約が存在するかどうかをチェックし、存在しない場合はGPTモデルを用いて要約を生成する。
-
-    Args:
-    application_num (str): 特許申請の番号。
-
-    Returns:
-    str: 特許の簡潔な要約。要約が存在しない場合は空の文字列を返す。
-    """
-    # 特許文書DBのインスタンスを作成
-    patentdoc = patentManager(collection_name="patents")
-
-    # 特許申請番号に基づいて簡潔な要約を取得
-    brief_summary = patentdoc.get_brief_summary(application_num)
-
-    # 既に簡潔な要約が存在する場合は、それを返す
-    if brief_summary != "":
-        return brief_summary
-
-    # GPTクライアントのインスタンスを作成
-    gpt = gptClient()
-
-    # 全文の要約を取得
-    summary = patentdoc.get_summary()
-
-    # 要約が存在しない場合は、エラーログを出力して空の文字列を返す
-    if summary == "":
-        logger.error(f"application number {application_num} doesn't have a summary.")
-        return ""
-
-    # GPTを使用して簡潔な要約を生成
-    brief_summary = gpt.make_brief_summary(summary)
-
-    # 生成した簡潔な要約を特許文書に設定
-    patentdoc.set_brief_summary(application_num, brief_summary)
-
-    # 生成した要約を返す
-    return brief_summary
-

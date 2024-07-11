@@ -1,4 +1,4 @@
-import re
+import re,os
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -39,17 +39,23 @@ class CleanFormatter(logging.Formatter):
         return self.ansi_escape.sub('', original)
 
 def setup_logging():
-    """アプリケーションのログ設定を行う関数。"""
+    """__summary__
+    
+    アプリケーションのログ設定を行う関数。
+    
+    """
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)  # デバッグレベル以上のすべてのログを記録
+    logger.setLevel(logging.DEBUG)  
 
     # コンソール出力用のハンドラー設定
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(ColorFormatter('%(levelname)s: %(message)s'))
+    console_handler.setLevel(logging.INFO)
     logger.addHandler(console_handler)
 
-    # ファイル出力用のハンドラー設定 INFO以上のみ記録する
-    file_handler = RotatingFileHandler('log/app.log', maxBytes=1048576, backupCount=3,encoding='utf-8')
-    file_handler.setLevel(logging.INFO)
+    # ファイル出力用のハンドラー設定 
+    log_path=os.path.join(os.path.dirname(os.path.abspath(__file__)),'../log/app.log')
+    file_handler = RotatingFileHandler(log_path, maxBytes=1048576, backupCount=3,encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(CleanFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(file_handler)

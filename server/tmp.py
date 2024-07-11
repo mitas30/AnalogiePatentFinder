@@ -1,7 +1,31 @@
-data1={'abstract_functions': [{'result': ['6']}, {'result': ['13']}, {'result': ['37']}, {'result': ['6', '19']}, {'result': ['1']}, {'result': ['9']}, {'result': ['8']}, {'result': ['32']}, {'result': ['3']}, {'result': ['6', '10']}, {'result': ['32']}, {'result': ['36']}, {'result': ['0']}, {'result': ['16']}, {'result': ['42', '43']}, {'result': ['0']}, {'result': ['23']}, {'result': ['16']}, {'result': ['0']}, {'result': ['0']}, {'result': ['6', '10']}, {'result': ['9']}, {'result': ['15', '20', '23']}, {'result': ['32']}, {'result': ['10', '26']}, {'result': ['33']}, {'result': ['18']}, {'result': ['26']}, {'result': ['0']}, {'result': ['0']}, {'result': ['31']}, {'result': ['31', '32']}, {'result': ['0']}, {'result': ['36']}, {'result': ['6', '10']}, {'result': ['41']}, {'result': ['32']}, {'result': ['11']}, {'result': ['34']}, {'result': ['3', '9', '10']}, {'result': ['31']}, {'result': ['36']}, {'result': ['43']}, {'result': ['46', '31']}, {'result': ['8', '10']}, {'result': ['41']}, {'result': ['0']}, {'result': ['43']}, {'result': ['41']}, {'result': ['0']}, {'result': ['31', '32', '24']}]}
-data={'abstract_functions': [{'result': ['33']}, {'result': ['38']}, {'result': ['9']}, {'result': ['0']}, {'result': ['33']}, {'result': ['31', '35']}, {'result': ['9']}, {'result': ['37', '38']}, {'result': ['11', '9']}, {'result': ['0']}, {'result': ['7']}, {'result': ['9', '20']}, {'result': ['27', '33']}, {'result': ['23', '18']}, {'result': ['33']}, {'result': ['42']}, {'result': ['0']}, {'result': ['36']}, {'result': ['36', '40']}, {'result': ['25']}, {'result': ['3', '33']}, {'result': ['33']}, {'result': ['0']}, {'result': ['11']}, {'result': ['20']}, {'result': ['27']}, {'result': ['0']}, {'result': ['31']}, {'result': ['25']}, {'result': ['25']}, {'result': ['30']}, {'result': ['31']}, {'result': ['36']}, {'result': ['16']}, {'result': ['0']}, {'result': ['31', '35']}, {'result': ['36']}, {'result': ['41']}, {'result': ['0']}, {'result': ['19']}, {'result': ['41']}, {'result': ['11']}, {'result': ['33']}, {'result': ['44']}, {'result': ['23']}, {'result': ['23']}, {'result': ['23']}, {'result': ['10']}, {'result': ['23']}]}
+import pprint,json,logging,time
+import google.generativeai as genai
+from setting_log.logging_config import setup_logging
 
-# 辞書の数をカウント
-dict_count = sum(isinstance(item, dict) for item in data['abstract_functions'])
+#* 実行ファイルでは、setup_logging()を呼び出す
+setup_logging()
+logger=logging.getLogger(__name__)
 
-print(f"辞書の数: {dict_count}")
+def load_api_info()->dict[str,str]:
+    # JSON設定ファイルを開いて読み込む
+    #ファイルのパスは、実行ファイルからの相対パス
+    with open('config/config.json', 'r') as file:
+        config = json.load(file)
+    ret_dict={}
+    ret_dict["GEMINI_API_KEY"]=config['GEMINI_API_KEY']
+    ret_dict["USE_GEMINI_MODEL"]=config['USE_GEMINI_MODEL']
+    return ret_dict
+
+if __name__ == "__main__":
+    gemini_info = load_api_info()
+    assert type(gemini_info)==dict
+    genai.configure(api_key=gemini_info["GEMINI_API_KEY"])
+    model=genai.GenerativeModel(model_name=gemini_info["USE_GEMINI_MODEL"])
+    sentence="2024年7月に、東京都知事選が行われることは知っていますか？\n注目するべき候補について教えて下さい。"
+    st=time.time()
+    response=model.generate_content(contents=f"{sentence}")
+    et=time.time()
+    logger.info(f"{round(et-st,4)}s")
+    logger.info(response.text)
+    logger.info(response.usage_metadata)
+    #logger.info(vars(response))
