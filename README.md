@@ -1,5 +1,5 @@
 # AnalogiePatentFinder
-Deep Learningを用いた自然言語処理技術によって、解決したい問題と構造的類似性のある特許を提示する、アナロジー型特許検索エンジン
+解決したい問題と構造的に類似性のある問題を解決した特許を探し、その工夫をわかりやすく提示するアナロジー検索エンジン。
 
 ## 参考文献
 1. L. Liu, Y. Li, Y. Xiong, and D. Cavallucci, “A new function-based patent knowledge retrieval tool for conceptual design of innovative products,” vol. 115, Nov. 2019, doi: 10.1016/j.compind.2019.103154.
