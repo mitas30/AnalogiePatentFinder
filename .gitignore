@@ -1,5 +1,7 @@
 #API_Keyの格納庫
 config.json
+.vscode/
+mongosh/
 
 # データの保管
 data/

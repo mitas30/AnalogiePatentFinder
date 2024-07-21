@@ -116,8 +116,8 @@ export default {
       strategy: "",
       application: "",
       loading: false,
-      abstractSolution:this.selectedResult.abstractSolution,
-      solution:this.selectedResult.solution,
+      abstractSolution: this.selectedResult.abstractSolution,
+      solution: this.selectedResult.solution,
     }
   },
   created() {
@@ -144,14 +144,14 @@ export default {
     async fetchExplanation() {
       console.log("説明の取得を試みている")
       try {
-        const response = await axios.get('http://127.0.0.1:5000/api/fetch_exist_explanation',
+        const response = await axios.get('/api/fetch_exist_explanation',
           {
             params: {
               apply_number: this.selectedResult.apply_number,
               parameter: this.selectedResult.parameter,
             }
           });
-        if (response.data.is_exist==true){
+        if (response.data.is_exist == true) {
           console.log("解説が存在したので、更新")
           this.is_explain = true;
           this.intro = response.data.intro;
@@ -168,7 +168,7 @@ export default {
       }
       try {
         //axios.postは、json形式でデータを送信する
-        const response = await axios.post('http://127.0.0.1:5000/api/redirect_full_patent',
+        const response = await axios.post('/api/redirect_full_patent',
           {
             apply_number: this.selectedResult.apply_number
           });
@@ -181,10 +181,10 @@ export default {
     },
     // 各特許についての解説を作成する
     async makeExplain() {
-      this.loading=true;
+      this.loading = true;
       try {
         console.log(this.selectedResult)
-        const response = await axios.post('http://127.0.0.1:5000/api/make_explain',
+        const response = await axios.post('/api/make_explain',
           {
             apply_number: this.selectedResult.apply_number,
             heading: this.selectedResult.solution,
@@ -196,7 +196,7 @@ export default {
         const data = response.data;
         console.log(data);
         //TODO 上のコンポーネントのデータも更新すること
-        if(data.is_heading_improved==true){
+        if (data.is_heading_improved == true) {
           this.abstractSolution = data.abstractSolution;
           this.solution = data.solution;
         }
@@ -207,9 +207,9 @@ export default {
       }
       catch (error) {
         console.error(error);
-        this.loading=false;
+        this.loading = false;
       }
-      this.loading=false;
+      this.loading = false;
     }
   },
 }

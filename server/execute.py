@@ -2,6 +2,7 @@ from services.service import patentProcessor
 from services import service
 from setting_log.logging_config import setup_logging
 import logging
+from time import perf_counter
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -114,15 +115,16 @@ def write_batch_add_heading(id_filename:str, output_filename:str):
 def aggregate_parameters():
     """ _summary_ 向上パラメータごとの特許数を集計する
     """
+    st_time=perf_counter()
     operator=service.expOperator()
-    logger.log(logging.INFO,"[向上パラメータ:一致特許数]")
     operator.aggr_clasified_impr_params()
+    end_time=perf_counter()
+    logger.log(logging.INFO,f"aggregate_parameters:{end_time-st_time}sec.")
     
 def aggreate_functions():
     """ _summary_ 機能ごとの特許数を集計する
     """
     operator=service.expOperator()
-    logger.log(logging.INFO,"[抽象機能:一致特許数]")
     operator.aggr_classified_function_classes()
     
 def make_new_abstract_documents():
@@ -138,7 +140,9 @@ if __name__ == "__main__":
     #batch_add_heading(150)
     #askbatch("batch_4OaIVjD1TQ5Mp3J5H12pOBuJ")
     #check_batch_add_heading(id_filename="add_heading_oid_1719042504",output_filename="batch_n8pWi")
-    write_batch_add_heading(id_filename="add_heading_oid_1719042504",output_filename="batch_n8pWi")
+    #write_batch_add_heading(id_filename="add_heading_oid_1719042504",output_filename="batch_n8pWi")
     #check_batch_categorize_function(id_filename="categorize_oid_1718797976",output_filename="batch_JHjp3")
     #write_batch_categorize_function(id_filename="categorize_oid_1718797976",output_filename="batch_JHjp3")
+    aggregate_parameters()
+    aggreate_functions()
     

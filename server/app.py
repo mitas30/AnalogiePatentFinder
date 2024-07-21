@@ -4,6 +4,7 @@ from setting_log.logging_config import setup_logging
 from api.api import patents_blueprint
 
 app = Flask(__name__)
+# /apiであるようなURLリクエストでは、すべてのオリジンを許可する
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # 任意のオリジンを許可
 app.register_blueprint(patents_blueprint, url_prefix='/api')
 

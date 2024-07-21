@@ -1,11 +1,12 @@
 import json,logging,os,shutil,re,datetime,time
 import fitz
 from bson.objectid import ObjectId
-from typing import Literal
+from typing import Literal,Tuple
 from fitz import Document
 from openai import OpenAI
 from models.model import patentManager,patentQuery,patentBulkUpdater,patentCleaner,abstractAdmin
-from api_service import patentUrlFetcher
+from .api_service import patentUrlFetcher
+import numpy as np,seaborn as sns,matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -1020,7 +1021,8 @@ class gptBatch:
     def _read_jsonl(self,file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
             return [json.loads(line) for line in file]
-                     
+
+#NOTE 現在のところ、このクラスは使用していない                     
 class fineTuning:
     def __init__(self):
         self.openai_api_key = self._load_api_key()
@@ -1111,17 +1113,28 @@ class expOperator:
     def __init__(self):
         pass
     
-    def aggr_clasified_impr_params(self):
+    def aggr_clasified_impr_params(self)->Tuple[list,list]:
         """_summary_ 分類された改善パラメータの数を集計して、logに出力する
         
         """
         db_query=patentQuery(collection_name="patents")
         res_list=db_query.get_parameter_counts()
-        cnt=0
+        class_list=[]
+        num_list=[]
         for res in res_list:
-            cnt+=res[1]
-            logger.log(logging.INFO,res)
-        logger.log(logging.INFO,f"パラメータ総計:{cnt}") 
+            class_list.append(res[0])
+            num_list.append(res[1])
+        class_data=np.array(class_list)
+        num_data=np.array(num_list)
+        fig,ax1=plt.subplots(1, 1, figsize=(12, 10))
+        #sns.~plotでグラフを作成する
+        sns.barplot(x=class_data,y=num_data,ax=ax1,color='skyblue')
+        ax1.set_title('frequency_by_improve_params')
+        ax1.set_xlabel('parameter_class')
+        ax1.set_ylabel('Flequency')
+        # グラフの表示
+        plt.tight_layout()
+        plt.show()
             
     def aggr_classified_function_classes(self):
         """_summary_ 分類されたfunction_classesの数を集計して、logに出力する
@@ -1129,11 +1142,22 @@ class expOperator:
         """
         db_query = patentQuery(collection_name="patents")
         res_list = db_query.get_function_class_counts()
-        cnt=0
+        class_list=[]
+        num_list=[]
         for res in res_list:
-            cnt+=res[1]
-            logger.log(logging.INFO, res)
-        logger.log(logging.INFO,f"クラス総計:{cnt}")    
+            class_list.append(res[0])
+            num_list.append(res[1])            
+        class_data=np.array(class_list)
+        num_data=np.array(num_list)
+        fig,ax1=plt.subplots(1, 1, figsize=(12, 10))
+        #sns.~plotでグラフを作成する
+        sns.barplot(x=class_data,y=num_data,ax=ax1,color='forestgreen')
+        ax1.set_title('frequency_by_functional_class')
+        ax1.set_xlabel('function_class')
+        ax1.set_ylabel('Flequency')
+        # グラフの表示
+        plt.tight_layout()
+        plt.show()        
 
 #! 以下の関数は、現在は使用していない            
 def update_documents_with_full_url(max_doc: int = None,

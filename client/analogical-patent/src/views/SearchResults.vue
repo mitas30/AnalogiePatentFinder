@@ -57,11 +57,13 @@ export default {
     const parameters = JSON.parse(to.query.parameters);
     console.log("Problem:", problem, "\nSelected:", parameters);
     try {
-      const response = await axios.get('http://127.0.0.1:5000/api/search', {
-      params: 
-      { problem:problem, 
-        selected:JSON.stringify(parameters) }
-    })
+      const response = await axios.get('/api/search', {
+        params:
+        {
+          problem: problem,
+          selected: JSON.stringify(parameters)
+        }
+      })
       //next(function)の形式
       next((vm) => {
         vm.results = response.data;
