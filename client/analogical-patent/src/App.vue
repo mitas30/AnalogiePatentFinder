@@ -5,7 +5,7 @@
     </v-system-bar>
     <v-app-bar color="primary">
       <v-app-bar-title>
-        Application Bar
+        Analogical Patent Finder
       </v-app-bar-title>
     </v-app-bar>
     <v-main>
@@ -13,7 +13,7 @@
       <router-view />
     </v-main>
     <v-footer color="primary" app>
-      Footer
+      mitas30
     </v-footer>
   </v-app>
 </template>
