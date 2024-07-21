@@ -2,6 +2,7 @@
 解決したい問題と構造的に類似性のある問題を解決した特許を探し、その工夫をわかりやすく提示するアナロジー検索エンジン。
 
 ## demo video
+https://github.com/user-attachments/assets/57123fa9-611a-4b85-8982-6007a24e1810
 
 
 ## experimental data
