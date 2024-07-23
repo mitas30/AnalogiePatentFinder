@@ -63,7 +63,7 @@ docker-compose up --build
 
 
 
-## demo video
+## Demo Video
 https://github.com/user-attachments/assets/57123fa9-611a-4b85-8982-6007a24e1810
 
 ## experimental data
