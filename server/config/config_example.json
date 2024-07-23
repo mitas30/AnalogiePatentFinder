@@ -1,0 +1,11 @@
+{
+    "GEMINI_API_KEY": "",
+    "USE_GEMINI_MODEL":"",
+    "OPENAI_API_KEY": "",
+    "USE_GPT_MODEL":"gpt-4o",
+    "USE_GPT_MODEL_LOW":"gpt-3.5-turbo",
+    "patent_office": {
+        "username": "",
+        "password": ""
+    }
+}

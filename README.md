@@ -1,7 +1,72 @@
 # AnalogiePatentFinder
 解決したい問題と構造的に類似性のある問題を解決した特許を探し、その工夫をわかりやすく提示するアナロジー検索エンジン。
 現在、Readmeは整備中です。  
-また、近日中にDocker-Composeで実行できるようにすることを考えています。
+
+もちろんです。以下に、より詳細で丁寧なドキュメントを記載します。
+
+---
+
+## Quick Start
+**DockerがPCにインストールされているなら、このプロジェクトを試すことができます。以下の手順に従ってください。**
+
+### 1. リポジトリのクローン
+まず、このリポジトリをクローンします。
+
+```sh
+git clone <リポジトリURL>
+cd <リポジトリディレクトリ>
+```
+
+### 2. 設定ファイルの編集
+次に、`server/config/`ディレクトリにある`config_example.json`ファイルを編集して、`config.json`という名前に変更します。
+
+#### `config_example.json` を `config.json` にリネーム
+
+```sh
+mv server/config/config_example.json server/config/config.json
+```
+
+#### `config.json` の編集
+以下のようにファイルを編集してください。
+
+- "GEMINI_API_KEY"：Google AI Studio (https://ai.google.dev/aistudio?hl=ja) にアクセスして取得したAPIキーを設定します。必ず値を `" "` で囲ってください。
+- "USE_GEMINI_MODEL"：使用したいGEMINIモデルを設定します。特にこだわりがなければ、`"gemini-1.5-pro"` を設定します。
+
+例：
+
+```json
+{
+    "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY_HERE",
+    "USE_GEMINI_MODEL": "gemini-1.5-pro",
+    ...
+}
+```
+
+**注意**：
+- 試すだけなら、`"GEMINI_API_KEY"` と `"USE_GEMINI_MODEL"` を設定するだけで十分です。
+- 無料で使えることを想定しています。請求が発生しないように、Google Cloudプロジェクトの課金設定はオフにしてください。
+
+### 3. Docker Composeを使用してプロジェクトをビルドおよび起動
+
+次に、このプロジェクトのルートディレクトリで以下のコマンドを実行します。
+
+```sh
+docker-compose up --build
+```
+
+このコマンドは、プロジェクトをビルドし、必要なすべてのコンテナを起動します。
+
+### 4. アプリケーションへのアクセス
+
+ビルドおよび起動が完了したら、以下のURLにアクセスしてアプリケーションを開きます。
+
+[http://localhost:5173/](http://localhost:5173/)
+
+---
+
+これで、アプリケーションが動作するはずです。何か問題が発生した場合は教えて下さい。
+
+
 
 ## demo video
 https://github.com/user-attachments/assets/57123fa9-611a-4b85-8982-6007a24e1810
