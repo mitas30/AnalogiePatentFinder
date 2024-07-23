@@ -23,5 +23,4 @@ const vuetify = createVuetify({
 
 //モダンjsの記法 : メソッドチェーン
 app.use(router).use(vuetify).mount('#app');
-console.info("DOCKERのURL確認",process.env.DOCKER_API_URL)
 

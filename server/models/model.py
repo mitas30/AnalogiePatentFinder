@@ -1,7 +1,7 @@
 from pymongo import MongoClient,UpdateOne
 from pymongo.errors import BulkWriteError
 from bson.objectid import ObjectId
-import json,logging,re
+import json,logging,os
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,9 @@ class databaseConnector:
             db_name (str): データベースの名前。デフォルトは 'analogie_finder'。
             collection_name (str): コレクションの名前。
         """
-        self.db_client = MongoClient()
+        self.host = os.getenv("MONGO_HOST", "localhost")
+        self.port = int(os.getenv("MONGO_PORT", 27017))
+        self.db_client = MongoClient(self.host, self.port)
         self.collection = self.db_client[db_name][collection_name]
         
 class DualCollectionConnector(databaseConnector):

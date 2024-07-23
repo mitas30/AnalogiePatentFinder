@@ -2,6 +2,7 @@
 config.json
 .vscode/
 mongosh/
+package-lock.json
 
 # データの保管
 data/

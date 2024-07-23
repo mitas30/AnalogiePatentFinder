@@ -37,7 +37,7 @@ class onlineGeminiClient:
             _type_: _description_
         """
         current_relative_dir=os.path.dirname(os.path.abspath(__file__))
-        file_path=os.path.join(current_relative_dir,"..\llm_prompt\gemini\classify_user_query.json")
+        file_path=os.path.join(current_relative_dir,"../llm_prompt/gemini/classify_user_query.json")
         with open(file_path, 'r',encoding='utf-8') as file:
             data=json.load(file)
         persona = data.get('persona')
@@ -74,7 +74,7 @@ class onlineGeminiClient:
             dict[str,str]: _description_
         """
         current_relative_dir=os.path.dirname(os.path.abspath(__file__))
-        file_path=os.path.join(current_relative_dir,"..\llm_prompt\gemini\create_explain_and_better_heading.json")
+        file_path=os.path.join(current_relative_dir,"../llm_prompt/gemini/create_explain_and_better_heading.json")
         with open(file_path, 'r',encoding='utf-8') as file:
             data=json.load(file)
         persona = data.get('persona')
@@ -98,7 +98,7 @@ class onlineGeminiClient:
             json_response=json.loads(response.text)
         except JSONDecodeError as e:
             logger.log(logging.ERROR,
-                       msg=f"エラー:{e.msg}\n"+
+                       msg=f"エラー:{e.msg}/n"+
                        f"ドキュメント:\n{e.doc}\n"+
                        f"位置:{e.pos}\n"+
                        f"{e.doc[e.pos-1:]}")  

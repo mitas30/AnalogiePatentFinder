@@ -6,8 +6,7 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const API_URL=process.env.DOCKER_API_URL || process.env.VITE_API_URL;
-console.log("API_URLは",API_URL)
+const API_URL=process.env.DOCKER_API_URL || 'http://localhost:5000';
 
 // https://vitejs.dev/config/
 // viteの設定ファイル
