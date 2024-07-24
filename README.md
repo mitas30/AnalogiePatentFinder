@@ -2,10 +2,6 @@
 解決したい問題と構造的に類似性のある問題を解決した特許を探し、その工夫をわかりやすく提示するアナロジー検索エンジン。
 現在、Readmeは整備中です。  
 
-もちろんです。以下に、より詳細で丁寧なドキュメントを記載します。
-
----
-
 ## Quick Start
 **DockerがPCにインストールされているなら、このプロジェクトを試すことができます。以下の手順に従ってください。**
 
@@ -62,13 +58,12 @@ docker-compose up --build
 
 [http://localhost:5173/](http://localhost:5173/)
 
----
 
 これで、アプリケーションが動作するはずです。何か問題が発生した場合は教えて下さい。
 
 
 
-## demo video
+## Demo Video
 https://github.com/user-attachments/assets/57123fa9-611a-4b85-8982-6007a24e1810
 
 ## experimental data
